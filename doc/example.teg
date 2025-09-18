@@ -1,0 +1,53 @@
+== comments defined with double = at the start of the line
+
+== lines starting with ! are calls
+== calls can execute functions, set variables and include files
+== you can find a list of call the calls in calls.txt
+
+== title and favicon - these get put into the head
+!var title=My amazing website!
+!var icon=/favicon.ico
+
+== automatically escape <, > and &
+!var escape=1
+
+!e body
+
+== to disambiguate calls for elements that can be nested, pass a name
+== here we name the header "md"
+!e header md
+
+# Markdown example
+
+== and then close the header
+!e header md
+
+We support *markdown*, cool right?
+All sorts of **bold**, __underscore__,
+> blockquotes
+- lists
+
+1. one
+2. two!
+3. three?!
+
+some `code` and
+```
+codeblocks!
+```
+
+[links](https://example.com)
+
+# heading 1
+## heading 2
+### heading 3
+#### heading 4
+##### heading 5
+###### heading 6
+
+things like <, >, & get escaped if you set the escape variable to 1
+
+== include an external file
+!inc bottom.proto
+
+!e body

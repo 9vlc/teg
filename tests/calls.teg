@@ -1,0 +1,14 @@
+== calls
+
+# exec
+
+!exec_raw uname -a
+!exec_fmt lsblk
+
+# inc
+
+Including a file
+
+!inc small.teg
+
+This line should come after the include

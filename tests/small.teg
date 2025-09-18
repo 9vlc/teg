@@ -1,0 +1,2 @@
+This machine is running
+!exec_raw uname

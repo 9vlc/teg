@@ -1,0 +1,35 @@
+== set value of "variable" to "value"
+== to be used for development and some calls
+!var variable=value
+
+== include "file.proto" at this point
+== works like include in any other programming language
+!inc file.proto - include a file
+
+== run a command and paste its output
+!exec_raw command
+
+== run a command and paste its output as a codeblock
+== (<code> inside <pre>)
+!exec_fmt command
+
+== put an element
+== div, body, etc.
+!e name [class] [properties]
+
+== notes:
+== head gets generated from variables. take a look at example.teg
+
+== elements open and close in relation to their classes
+== an example:
+!e body
+some text
+
+!e div box1
+!e div box2
+text inside box2
+!e div box2
+and text inside box1 after box2
+!e div box1
+
+!e body

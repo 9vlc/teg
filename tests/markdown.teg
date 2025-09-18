@@ -1,0 +1,90 @@
+== markdown test
+
+# headings / heading 1
+## heading 2
+### heading 3
+#### heading 4
+##### heading 5
+###### heading 6
+
+# simple markdown
+
+horizontal rule:
+---
+text
+
+```
+#!/bin/sh
+echo "this is a codeblock!"
+exit 0
+```
+
+**bold**
+
+*italic1*
+
+***bold italic***
+
+~~strikethrough~~
+
+__underline__
+
+hello this is a [link](https://example.com) how cool
+
+![image](https://picsum.photos/128/128)
+
+`code`
+
+# blockquotes
+
+## splitting
+
+> hi!
+> this is a blockquote test.
+
+> the previous text should all be on the same line.
+>
+> this text should be split into two different lines.
+
+## depth
+
+> you know what they say?
+>> depth 2 is better than
+>> depth 1!
+
+> and this is a depth 1 blockquote
+>> with depth 2 inside
+> back to depth 1
+
+## invalid blockquotes
+
+>this is invalid
+ >this is invalid
+    > this is invalid
+<>this is invalid
+
+## mess
+
+>>> .
+>>>>> .
+> .
+>>>>>>>>>>>> .
+>>>>>> .
+>>>>>>>> .
+>> .
+>>>>> .
+>>>>>>>> .
+>>>> .
+
+## markdown inside blockquotes
+
+> **bold**
+>
+> *italic 1*
+>
+> __underscore__
+>
+> [link](https://example.com)
+
+# lists
+not implemented, not making a section for them here for now.
