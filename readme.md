@@ -1,5 +1,6 @@
 # teg
-static website generator in awk,
+static website generator in awk.
+
 markdown to html w/ function calls, variables and other tricks.
 
 # how do i use this?
