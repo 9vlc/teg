@@ -4,7 +4,7 @@
 
 == include "file.proto" at this point
 == works like include in any other programming language
-!inc file.proto - include a file
+!inc file.proto
 
 == run a command and paste its output
 !exec_raw command
