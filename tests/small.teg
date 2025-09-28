@@ -1,2 +1,13 @@
+!var title=test page
+!var description=example description
+!var color_chrome=#ff0000
+!start
+
 This machine is running
 !exec_raw uname
+==
+!inc markdown.teg
+==
+!exec_fmt lsblk | head -n5
+
+# hello

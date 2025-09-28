@@ -39,21 +39,36 @@ BEGIN {
 		file = ARGV[1]
 	
 	reached_data = 0
+	reached_start = 0
 	inside_codeblock = 0
 	blockquote_lvl[0] = 0
 	blockquote_lvl[1] = 0
-	prev_str = "<null"
+	prev_str = "<hnull"
+	
+	c_vars["escape"] = 1
+	c_vars["title"] = file
+	c_vars["description"] = 0
+	c_vars["lang"] = "en-US"
+	c_vars["icon"] = 0
+	c_vars["style"] = 0
+	c_vars["script"] = 0
+	c_vars["color_chrome"] = 0
+	c_vars["debug"] = 1
 
-	current_line = 1
-	escape = 1
-	title = file
-	icon = "/favicon.ico"
-	style = "/style.css"
+	print "<!DOCTYPE html>"
+	print "<!-- Generated with teg: https://github.com/9vlc/teg -->"
 }
 
 function dirname(path) {
-    sub(/[^/]*$/, "", path)
+    sub(/[^\/]*$/, "", path)
     return (path ? path : "./")
+}
+
+function dlog(txt) {
+	if (c_vars["debug"])
+		print "!!!DEBUG!!! " txt > "/dev/stderr"
+	else
+		return 1
 }
 
 function escape_html(str) {
@@ -164,14 +179,16 @@ function md_fmt(str) {
 	#
 	# add br if there's two consecutive \n
 	#
-	if (str ~ /^$/ && prev_str !~ /^(<h[1-6]|<br)/)
+	if (str ~ /^$/ && prev_str !~ /(<\/?h[1-6]|<br)/) {
 		str = "<br class=\"nl\">"
+		dlog(prev_str)
+	}
 
 	#
 	# bold, italic, underscode, strikethrough
 	#
-	str = md_resurround(str, "strong", "\*\*[^*]+\*\*", 2)
-	str = md_resurround(str, "em", "\*[^*]+\*", 1)
+	str = md_resurround(str, "strong", "\\*\\*[^*]+\\*\\*", 2)
+	str = md_resurround(str, "em", "\\*[^*]+\\*", 1)
 	str = md_resurround(str, "u", "__[^_]+__", 2)
 	str = md_resurround(str, "s", "~~[^~]+~~", 2)
 	str = md_resurround(str, "code", "`[^`]+`", 1)
@@ -205,20 +222,20 @@ function md_fmt(str) {
 
 
 !/^==/ && !/^![^\[]/ {
-	if ($0 !~ /^[[:space:]]*$/)
+	if ($0 !~ /^[ \t]*$/)
 		reached_data = 1
-	if (reached_data == 0)
+	if (!reached_data)
 		next
-	
-	if (escape == 1)
+	if (!reached_start) {
+		print "warning: skipping data before start call" > "/dev/stderr"
+		next
+	}
+
+	if (c_vars["escape"])
 		$0 = escape_html($0)
 
 	$0 = md_fmt($0)
 
-	#
-	# debug
-	#
-	# printf("%4.d| %s\n", current_line, $0)
 	print $0
 }
 
@@ -229,13 +246,42 @@ function md_fmt(str) {
 	$0 = substr($0, 2)
 	call = $1
 	$1 = ""
-	sub(/^[[:space:]]+/, "", $0)
+	sub(/^[ \t]+/, "", $0)
+	
+	if (!reached_start && call !~ /(inc|var|start)/) {
+		print "warning: skipping data before start call" > "/dev/stderr"
+		next
+	}
 
 	#
 	# element
 	#
 	if (call == "e") {
 		# TODO: hell
+	#
+	# place the head part of the website
+	#
+	} else if (call == "start") {
+		if (reached_start)
+			next
+		print "<html lang=\"" c_vars["lang"] "\">"
+		print "<head>"
+		print "  <meta charset=\"UTF-8\"/>"
+		if (c_vars["title"])
+			print "  <title>" c_vars["title"] "</title>"
+		if (c_vars["description"])
+			print "  <meta name=\"description\" content=\"" c_vars["description"] "\"/>"
+		if (c_vars["color_chrome"])
+			print "  <meta name=\"theme-color\" content=\"" c_vars["color_chrome"] "\"/>"
+		if (c_vars["icon"])
+			print "  <link rel=\"icon\" href=\"" c_vars["icon"] "\"/>"
+		if (c_vars["style"])
+			print "  <link rel=\"stylesheet\" type=\"text/css\" href=\"" c_vars["style"] "\">"
+		if (c_vars["script"])
+			print "  <script src=\"" c_vars["script"] "\">"
+		print "</head>"
+		print "<body>"
+		reached_start = 1
 	#
 	# raw command output
 	#
@@ -256,24 +302,34 @@ function md_fmt(str) {
 		}
 		close(cmd)
 		printf("</code></pre>")
+		# don't add a newline that may appear after the codeblock
+		prev_str = "<br"
 	#
 	# include a file
 	#
 	} else if (call == "inc") {
-		#ARGV[ARGC] = dirname(file) $0
-		# ARGV[ARGC] = "./call.teg"
-		#ARGC ++
-		#next
-		# TODO: explode this
+		print "warning: includes not implemented" > "/dev/stderr"
+		next
 	#
 	# set a variable
 	#
 	} else if (call == "var") {
 		match($0, /[^=]+/)
 		key = substr($0, 1, RLENGTH)
+		sub(/^[ \t]+/, "", key)
 		value = substr($0, RLENGTH + 2)
-		ENVIRON[key] = value
+		if (value ~ /^-?[0-9]+$/)
+			c_vars[key] = value + 0
+		else
+			c_vars[key] = value
+
+		dlog("'"key"' ""'"value"'")
 	}
 }
 
-{ current_line += 1 }
+END {
+	if (reached_start) {
+		print "</body>"
+		print "</html>"
+	}
+}

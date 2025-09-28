@@ -2,9 +2,13 @@
 == to be used for development and some calls
 !var variable=value
 
+== start of the website
+== puts head and body
+!start
+
 == include "file.proto" at this point
 == works like include in any other programming language
-!inc file.proto - include a file
+!inc file.proto
 
 == run a command and paste its output
 !exec_raw command
@@ -17,13 +21,8 @@
 == div, body, etc.
 !e name [class] [properties]
 
-== notes:
-== head gets generated from variables. take a look at example.teg
-
 == elements open and close in relation to their classes
 == an example:
-!e body
-some text
 
 !e div box1
 !e div box2

@@ -4,14 +4,19 @@
 == calls can execute functions, set variables and include files
 == you can find a list of call the calls in calls.txt
 
-== title and favicon - these get put into the head
+== website settings
 !var title=My amazing website!
+!var description=This text will appear in search engines
+!var color_chrome=#ffffff
 !var icon=/favicon.ico
+!var lang=en-US
 
-== automatically escape <, > and &
+== add <html>, <head> and <body>
+== must be placed before any other element
+!start
+
+== automatically escape <, > and & (default is already 1)
 !var escape=1
-
-!e body
 
 == to disambiguate calls for elements that can be nested, pass a name
 == here we name the header "md"
@@ -49,5 +54,3 @@ things like <, >, & get escaped if you set the escape variable to 1
 
 == include an external file
 !inc bottom.proto
-
-!e body
