@@ -1,13 +1,15 @@
 !var title=test page
 !var description=example description
 !var color_chrome=#ff0000
+!var style_inline=ext/style.css
+!var script_inline=ext/test.js
 !start
-
-This machine is running
-!exec_raw uname
+test
+==This machine is running
+==!exec_raw uname
 ==
-!inc markdown.teg
+==!inc markdown.teg
 ==
-!exec_fmt lsblk | head -n5
-
-# hello
+==!exec_fmt lsblk | head -n5
+==
+==# hello

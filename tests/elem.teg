@@ -1,0 +1,27 @@
+!var title=elements
+!start
+
+# elements
+
+!e marquee test
+hello, world
+!e marquee test
+
+!e div
+
+!e div
+
+!e div d1
+hello1
+!e div d2 prop="something"
+?
+!e div d3
+.
+!e div d3
+..
+!e div d2
+...
+!e div d1
+
+!eo hr def
+hello

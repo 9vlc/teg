@@ -5,11 +5,11 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2025 Alexey Laurentsyeu
-# 
+#
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
 # are met:
-# 
+#
 # 1. Redistributions of source code must retain the above copyright
 # 	notice, this list of conditions and the following disclaimer.
 # 2. Redistributions in binary form must reproduce the above copyright
@@ -18,7 +18,7 @@
 # 3. Neither the name of the copyright holder nor the names of its
 # 	contributors may be used to endorse or promote products derived from
 # 	this software without specific prior written permission.
-# 
+#
 # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 # "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
 # LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -31,27 +31,28 @@
 # NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-
 BEGIN {
 	if (ARGC <= 1)
 		file = "stdin"
 	else
 		file = ARGV[1]
-	
+
 	reached_data = 0
 	reached_start = 0
 	inside_codeblock = 0
 	blockquote_lvl[0] = 0
 	blockquote_lvl[1] = 0
 	prev_str = "<hnull"
-	
+
 	c_vars["escape"] = 1
 	c_vars["title"] = file
 	c_vars["description"] = 0
 	c_vars["lang"] = "en-US"
 	c_vars["icon"] = 0
 	c_vars["style"] = 0
+	c_vars["style_inline"] = 0
 	c_vars["script"] = 0
+	c_vars["script_inline"] = 0
 	c_vars["color_chrome"] = 0
 	c_vars["debug"] = 1
 
@@ -59,16 +60,34 @@ BEGIN {
 	print "<!-- Generated with teg: https://github.com/9vlc/teg -->"
 }
 
-function dirname(path) {
-    sub(/[^\/]*$/, "", path)
-    return (path ? path : "./")
+function exists(file,   ret) {
+	if ((getline _ < file) != -1)
+		ret = 1
+	else
+		ret = 0
+	close(file)
+	return ret
 }
 
-function dlog(txt) {
-	if (c_vars["debug"])
-		print "!!!DEBUG!!! " txt > "/dev/stderr"
-	else
-		return 1
+function relpath(path,   dir) {
+	if (match(path, /^\//) || file == "stdio")
+		return path
+	dir = file
+    sub(/[^\/]*$/, "", dir)
+	return dir path
+}
+
+function logt(txt, type) {
+	if (type == 1 || !type)
+		if (c_vars["debug"])
+			print "debug: " txt > "/dev/stderr"
+		else
+			return 1
+	if (type == 2)
+		print "warning: " txt > "/dev/stderr"
+	if (type == 3)
+		{ print "error: " txt > "/dev/stderr"; exit 1 }
+	return 0
 }
 
 function escape_html(str) {
@@ -81,20 +100,31 @@ function escape_html(str) {
 	return str;
 }
 
-function md_resurround(str, elem, regexp, flen) {
+function md_resurround(str, elem, regexp, flen,   start,mid,end) {
 	while (i = match(str, regexp)) {
+		logt(str)
 		start = substr(str, 1, i - 1)
-		mid = substr(str, i + flen, RLENGTH - flen * 2)
+		mid = substr(str, i + flen, RLENGTH - 2 * flen)
 		end = substr(str, i + RLENGTH)
 		str = start "<"elem">" mid "</"elem">" end
 	}
 	return str
 }
 
+function md_resurround_wrap(str) {
+	#
+	# bold, italic, underscode, strikethrough, etc
+	#
+	str = md_resurround(str, "strong", "\\*\\*[^*]+\\*\\*", 2)
+	str = md_resurround(str, "em", "\\*[^*]+\\*", 1)
+	str = md_resurround(str, "u", "__[^_]+__", 2)
+	str = md_resurround(str, "s", "~~[^~]+~~", 2)
+	str = md_resurround(str, "code", "`[^`]+`")
+	return str
+}
+
 #
-# scary
-#
-# TODO: ordered lists, unordered lists
+# whatever
 #
 function md_fmt(str) {
 	#
@@ -103,7 +133,7 @@ function md_fmt(str) {
 	if (inside_codeblock) {
 		if (inside_codeblock == 2) {
 			inside_codeblock = 1
-			return "<pre><code>" str
+			return "<pre class=\"cb\"><code class=\"cb\">" str
 		} else if (str == "```") {
 			inside_codeblock = 0
 			return "</code></pre>"
@@ -113,6 +143,8 @@ function md_fmt(str) {
 		inside_codeblock = 2
 		return
 	}
+
+	str = md_resurround_wrap(str)
 
 	#
 	# headings
@@ -129,12 +161,12 @@ function md_fmt(str) {
 		str = "<h5>" substr(str, 7) "</h5>"
 	if (str ~ /^###### /)
 		str = "<h6>" substr(str, 8) "</h6>"
-	
+
 	#
 	# horizontal rule
 	#
 	if (str ~ /^---+$/)
-		str = "<br class=\"hrule\">"
+		str = "<hr>"
 
 	#
 	# blockquotes
@@ -181,34 +213,30 @@ function md_fmt(str) {
 	#
 	if (str ~ /^$/ && prev_str !~ /(<\/?h[1-6]|<br)/) {
 		str = "<br class=\"nl\">"
-		dlog(prev_str)
+		logt(prev_str)
 	}
-
-	#
-	# bold, italic, underscode, strikethrough
-	#
-	str = md_resurround(str, "strong", "\\*\\*[^*]+\\*\\*", 2)
-	str = md_resurround(str, "em", "\\*[^*]+\\*", 1)
-	str = md_resurround(str, "u", "__[^_]+__", 2)
-	str = md_resurround(str, "s", "~~[^~]+~~", 2)
-	str = md_resurround(str, "code", "`[^`]+`", 1)
 
 	#
 	# links and images
 	#
-	while (ix[0] = match(str, /\[.*\]\(.*\)/)) {
+	while (ix = match(str, /\[[^\]]*\]\([^)]*\)/)) {
 		is_image = 0
-		rl[0] = RLENGTH
-		link_md = substr(str, ix[0], rl[0])
-		
-		if (substr(str, ix[0] - 1, 1) == "!")
-			is_image = 1
-		
-		start = substr(str, 1, ix[0] - 1)
+		rl = RLENGTH
+		link_md = substr(str, ix, rl)
 
-		text = substr(link_md, 2, match(link_md, "]") - 2)
-		link = substr(link_md, length(text) + 4, rl[0] - length(text) - 4)
-		end = substr(str, ix[0] + rl[0])
+		if (substr(str, ix - 1, 1) == "!")
+			is_image = 1
+
+		text = substr(link_md, 2, index(link_md, "]") - 2)
+		link = substr(link_md, length(text) + 4, rl - length(text) - 4)
+
+		start = substr(str, 1, ix - 1)
+		end = substr(str, ix + rl)
+
+		logt("s: '" start "'")
+		logt("t: '" text "'")
+		logt("l: '" link "'")
+		logt("e: '" end "'")
 
 		if (is_image)
 			str = substr(start, 1, length(start) - 1) "<img alt=\""text"\" src=\""link"\">" end
@@ -216,18 +244,43 @@ function md_fmt(str) {
 			str = start "<a href=\""link"\">"text"</a>" end
 	}
 
+	#
+	# spoilers
+	# note: formed like ||[preview text]text inside spoiler||
+	#
+	while (ix = match(str, /\|\|\[[^\]]*\][^\|]*\|\|/)) {
+		rl = RLENGTH
+		spoiler_md = substr(str, ix, rl)
+		logt("m: " spoiler_md)
+
+		preview = substr(spoiler_md, 4, index(spoiler_md, "]") - 4)
+		text = substr(spoiler_md, length(preview) + 5, rl - length(preview) - 6)
+
+		start = substr(str, 1, ix - 1)
+		end = substr(str, ix + rl)
+
+		logt("s: '" start "'")
+		logt("p: '" preview "'")
+		logt("t: '" text "'")
+		logt("e: '" end "'")
+
+		str = start "<details><summary>" preview "</summary>" text "</details>" end
+	}
+
 	prev_str = str
 	return str
 }
 
-
+#
+# run main processing
+#
 !/^==/ && !/^![^\[]/ {
 	if ($0 !~ /^[ \t]*$/)
 		reached_data = 1
 	if (!reached_data)
 		next
 	if (!reached_start) {
-		print "warning: skipping data before start call" > "/dev/stderr"
+		logt("skipping data before start call", 2)
 		next
 	}
 
@@ -247,17 +300,54 @@ function md_fmt(str) {
 	call = $1
 	$1 = ""
 	sub(/^[ \t]+/, "", $0)
-	
+
 	if (!reached_start && call !~ /(inc|var|start)/) {
-		print "warning: skipping data before start call" > "/dev/stderr"
+		logt("skipping data before start call", 2)
 		next
 	}
+
+	logt("!" call " " $0, 1)
 
 	#
 	# element
 	#
 	if (call == "e") {
-		# TODO: hell
+		elem_name = $1
+		elem_class = ($2 ? $2 : "def")
+		$1 = ""
+		$2 = ""
+		elem_props = $0
+		sub(/^[ \t]+/, "", elem_props)
+
+		if (!elems[elem_name "_" elem_class]) {
+			logt("new element: '" elem_name "'")
+			elems[elem_name "_" elem_class] = 1
+			nest_lvl ++
+			printf("<%s%s%s>\n",
+				elem_name,
+				(elem_class == "def" ? "" : " class=\"" elem_class "\""),
+				(elem_props  ? " " elem_props : ""))
+		} else {
+			logt("closing element: '" elem_name "'")
+			elems[elem_name "_" elem_class] = 0
+			nest_lvl --
+			print "</" elem_name ">"
+		}
+	#
+	# element one shot (for self closing tags)
+	#
+	} else if (call == "eo") {
+		elem_name = $1
+		elem_class = ($2 ? $2 : "def")
+		$1 = ""
+		$2 = ""
+		elem_props = $0
+		sub(/^[ \t]+/, "", elem_props)
+
+		printf("<%s%s%s>\n",
+			elem_name,
+			(elem_class == "def" ? "" : " class=\"" elem_class "\""),
+			(elem_props  ? " " elem_props : ""))
 	#
 	# place the head part of the website
 	#
@@ -266,19 +356,53 @@ function md_fmt(str) {
 			next
 		print "<html lang=\"" c_vars["lang"] "\">"
 		print "<head>"
-		print "  <meta charset=\"UTF-8\"/>"
+		print "\t<meta charset=\"UTF-8\">"
+		print "\t<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
+
 		if (c_vars["title"])
-			print "  <title>" c_vars["title"] "</title>"
+			print "\t<title>" c_vars["title"] "</title>"
+
 		if (c_vars["description"])
-			print "  <meta name=\"description\" content=\"" c_vars["description"] "\"/>"
+			print "\t<meta name=\"description\" content=\"" c_vars["description"] "\">"
+
 		if (c_vars["color_chrome"])
-			print "  <meta name=\"theme-color\" content=\"" c_vars["color_chrome"] "\"/>"
+			print "\t<meta name=\"theme-color\" content=\"" c_vars["color_chrome"] "\">"
+
 		if (c_vars["icon"])
-			print "  <link rel=\"icon\" href=\"" c_vars["icon"] "\"/>"
+			print "\t<link rel=\"icon\" href=\"" c_vars["icon"] "\">"
+
 		if (c_vars["style"])
-			print "  <link rel=\"stylesheet\" type=\"text/css\" href=\"" c_vars["style"] "\">"
+			print "\t<link rel=\"stylesheet\" type=\"text/css\" href=\"" c_vars["style"] "\">"
+
+		if (c_vars["style_inline"]) {
+			logt("starting inline style")
+			logt("style file: '" relpath(c_vars["style_inline"]) "'")
+			if (exists(relpath(c_vars["style_inline"]))) {
+				print "\t<style>"
+				while (getline line < relpath(c_vars["style_inline"]) > 0)
+					print line
+				print "\t</style>"
+				close(c_vars["style_inline"])
+			} else
+				logt("style file '" relpath(c_vars["style_inline"]) "' does not exist", 2)
+		}
+
 		if (c_vars["script"])
-			print "  <script src=\"" c_vars["script"] "\">"
+			print "\t<script src=\"" c_vars["script"] "\">"
+
+		if (c_vars["script_inline"]) {
+			logt("starting inline script")
+			logt("script file: '" relpath(c_vars["script_inline"]) "'")
+			if (exists(relpath(c_vars["script_inline"]))) {
+				print "\t<script>"
+				while (getline line < relpath(c_vars["script_inline"]) > 0)
+					print line
+				print "\t</script>"
+				close(c_vars["script_inline"])
+			} else
+				logt("script file '" relpath(c_vars["script_inline"]) "' does not exist", 2)
+		}
+
 		print "</head>"
 		print "<body>"
 		reached_start = 1
@@ -287,16 +411,15 @@ function md_fmt(str) {
 	#
 	} else if (call == "exec_raw") {
 		cmd = $0
-		while((cmd | getline line) > 0) {
+		while((cmd | getline line) > 0)
 			print line
-		}
 		close(cmd)
 	#
 	# codeblock command output
 	#
 	} else if (call == "exec_fmt") {
 		cmd = $0
-		printf("<pre><code>")
+		printf("<pre class=\"cb\"><code class=\"cb\">")
 		while((cmd | getline line) > 0) {
 			print escape_html(line)
 		}
@@ -308,7 +431,7 @@ function md_fmt(str) {
 	# include a file
 	#
 	} else if (call == "inc") {
-		print "warning: includes not implemented" > "/dev/stderr"
+		logt("includes not implemented", 2)
 		next
 	#
 	# set a variable
@@ -323,7 +446,7 @@ function md_fmt(str) {
 		else
 			c_vars[key] = value
 
-		dlog("'"key"' ""'"value"'")
+		logt("'"key"' = ""'"value"'")
 	}
 }
 
