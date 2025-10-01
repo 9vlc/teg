@@ -8,7 +8,7 @@
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
-# are met
+# are met:
 #
 # 1. Redistributions of source code must retain the above copyright
 # 	notice, this list of conditions and the following disclaimer.
@@ -58,19 +58,15 @@ BEGIN {
 
 }
 
-#
-# does this file exist?
-#
-function exists(file,   r) {
-	r = getline _ < file
+function exists(file,   ret) {
+	if ((getline _ < file) != -1)
+		ret = 1
+	else
+		ret = 0
 	close(file)
-	return (r > -1 ? 1 : 0)
+	return ret
 }
 
-#
-# return relative (or not) path of argument path in relation to
-# currently worked on file's path
-#
 function relpath(path,   dir) {
 	if (match(path, /^\//) || file == "stdio")
 		return path
@@ -79,13 +75,6 @@ function relpath(path,   dir) {
 	return dir path
 }
 
-#
-# logs various messages to stderr
-# types:
-# 1 - debug
-# 2 - warning
-# 3 - error
-#
 function logt(txt, type) {
 	if (type == 1 || !type)
 		if (c_vars["debug"])
@@ -99,9 +88,6 @@ function logt(txt, type) {
 	return 0
 }
 
-#
-# escape symbols like & < > " '
-#
 function escape_html(str) {
 	gsub(/&/, "\\&amp;", str);
 	gsub(/"/, "\\&quot;", str);
@@ -112,12 +98,6 @@ function escape_html(str) {
 	return str;
 }
 
-#
-# str - input string
-# elem - html element to put match in
-# regexp - regex match for a symmetric surround of a word
-# flen - length of one of the sides of the surround (DO NOT OMMIT!!!!!!)
-#
 function md_resurround(str, elem, regexp, flen,   start,mid,end) {
 	while (i = match(str, regexp)) {
 		logt(str)
@@ -129,9 +109,6 @@ function md_resurround(str, elem, regexp, flen,   start,mid,end) {
 	return str
 }
 
-#
-# a function no one wanted yet here it is
-#
 function md_resurround_wrap(str) {
 	#
 	# bold, italic, underscode, strikethrough, etc
@@ -140,14 +117,12 @@ function md_resurround_wrap(str) {
 	str = md_resurround(str, "em", "\\*[^*]+\\*", 1)
 	str = md_resurround(str, "u", "__[^_]+__", 2)
 	str = md_resurround(str, "s", "~~[^~]+~~", 2)
-	str = md_resurround(str, "code", "`[^`]+`", 1)
+	str = md_resurround(str, "code", "`[^`]+`")
 	return str
 }
 
 #
-# whatever.
-# stores a whole bunch of global variables, call this for each line you
-# want to convert from markdown to html
+# whatever
 #
 function md_fmt(str) {
 	#
@@ -295,265 +270,185 @@ function md_fmt(str) {
 }
 
 #
-# !e element class options
+# run main processing
 #
-# place an element (html tag)
-# stores a list of elements in a global variable and
-# closes them when user calls the same element again
-#
-function calls_e(call,   elem_name,elem_class,elem_props) {
-	elem_name = call[$1]
-	elem_class = (call[2] ? call[2] : "def")
-
-	for (i = 3; i <= length(call); i++)
-		elem_props = elem_props (i > 3 ? " " : "") call[i]
-	sub(/^[ \t]+/, "", elem_props)
-
-	if (!elems[elem_name "_" elem_class]) {
-		logt("new element: '" elem_name "'")
-		elems[elem_name "_" elem_class] = 1
-		elem_nest_lvl ++
-		return sprintf("<%s%s%s>\n",
-			elem_name,
-			(elem_class == "def" ? "" : " class=\"" elem_class "\""),
-			(elem_props  ? " " elem_props : ""))
-	} else {
-		logt("closing element: '" elem_name "'")
-		elems[elem_name "_" elem_class] = 0
-		elem_nest_lvl --
-		return "</" elem_name ">"
-	}
-}
-
-#
-# !eo element class options
-#
-# same as before, just don't remember the state
-# meant for self-closing tags
-#
-function calls_eo(call,   elem_name,elem_class,elem_props) {
-	elem_name = call[$1]
-	elem_class = (call[2] ? call[2] : "def")
-
-	for (i = 3; i <= length(call); i++)
-		elem_props = elem_props (i > 3 ? " " : "") call[i]
-	sub(/^[ \t]+/, "", elem_props)
-
-	return sprintf("<%s%s%s>\n",
-		elem_name,
-		(elem_class == "def" ? "" : " class=\"" elem_class "\""),
-		(elem_props  ? " " elem_props : ""))
-}
-
-#
-# !start
-#
-# start the page
-# creates doctype, head, opens body.
-#
-function calls_start(call,   str,line) {
-	str = ""
-
-	if (reached_start)
-		return
-	str = str     "<!DOCTYPE html>"
-	str = str"\n" "<!-- Generated with teg: https://github.com/9vlc/teg -->"
-	str = str"\n" "<html lang=\"" c_vars["lang"] "\">"
-	str = str"\n" "<head>"
-	str = str"\n" "\t<meta charset=\"UTF-8\">"
-	str = str"\n" "\t<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
-
-	if (c_vars["title"])
-		str = str"\n" "\t<title>" c_vars["title"] "</title>"
-
-	if (c_vars["description"])
-		str = str"\n" "\t<meta name=\"description\" content=\"" c_vars["description"] "\">"
-
-	if (c_vars["color_chrome"])
-		str = str"\n" "\t<meta name=\"theme-color\" content=\"" c_vars["color_chrome"] "\">"
-
-	if (c_vars["icon"])
-		str = str"\n" "\t<link rel=\"icon\" href=\"" c_vars["icon"] "\">"
-
-	if (c_vars["style"])
-		str = str"\n" "\t<link rel=\"stylesheet\" type=\"text/css\" href=\"" c_vars["style"] "\">"
-
-	if (c_vars["style_inline"]) {
-		logt("starting inline style")
-		logt("style file: '" relpath(c_vars["style_inline"]) "'")
-		if (exists(relpath(c_vars["style_inline"]))) {
-			str = str"\n" "\t<style>"
-			while (getline line < relpath(c_vars["style_inline"]) > 0)
-				str = str"\n" line
-			str = str"\n" "\t</style>"
-			close(c_vars["style_inline"])
-		} else
-			logt("style file '" relpath(c_vars["style_inline"]) "' does not exist", 2)
-	}
-
-	if (c_vars["script"])
-		str = str"\n" "\t<script src=\"" c_vars["script"] "\">"
-
-	if (c_vars["script_inline"]) {
-		logt("starting inline script")
-		logt("script file: '" relpath(c_vars["script_inline"]) "'")
-		if (exists(relpath(c_vars["script_inline"]))) {
-			str = str"\n" "\t<script>"
-			while (getline line < relpath(c_vars["script_inline"]) > 0)
-				str = str"\n" line
-			str = str"\n" "\t</script>"
-			close(c_vars["script_inline"])
-		} else
-			logt("script file '" relpath(c_vars["script_inline"]) "' does not exist", 2)
-	}
-
-	reached_start = 1
-	str = str"\n" "</head>"
-	str = str"\n" "<body>"
-	return str
-}
-
-#
-# !exec_raw command ...
-#
-# execute a command and return its output
-#
-function calls_exec_raw(call,   str,line) {
-	str = ""
-	while((call[0] | getline line) > 0)
-		str = (str ? str "\n" : "") line
-	close(call[0])
-
-	return str
-}
-
-#
-# !exec_fmt command ...
-#
-# same as before, just place the output in a codeblock
-#
-function calls_exec_fmt(call,   str,line) {
-	str = ""
-	while((call[0] | getline line) > 0) {
-		str = (str ? str "\n" : "") escape_html(line)
-	}
-	close(call[0])
-	# make the markdown formatter not add a break after code
-	prev_str = "<br"
-
-	return "<pre class=\"cb\"><code class=\"cb\">" str "</code></pre>"
-}
-
-#
-# !var variable=value
-#
-# set variable to value.
-# if value is not provided
-#
-function calls_var(call,   eqpos,key,value) {
-	eqpos = index(call[0], "=")
-	if (!eqpos)
-		return c_vars[key]
-
-	key = substr(call[0], 1, eqpos - 1)
-	value = substr(call[0], eqpos + 1)
-
-	if (value ~ /^-?[0-9]+$/)
-		c_vars[key] = value + 0
-	else
-		c_vars[key] = value
-
-	logt("'"key"' = ""'"value"'")
-	return
-}
-
-#
-# !inc file
-#
-# include a file
-# this was the most difficult call to implement
-#
-function calls_inc(call) {
-	return
-}
-
-#
-# everything
-#
-function tegproc(str) {
-	if (str ~ /^==/)
-		return
-
-	#
-	# calls
-	#
-	if (str ~ /^![^\[]/) {
-		#
-		# what we got:
-		# call[0]  - args, concat
-		# call[1+] - args, split
-		#
-
-		str = substr(str, 2)
-		len = split(str, call, " ")
-
-		call["name"] = call[1]
-		for (i = 2; i <= len; i++) {
-			call[i - 1] = call[i]
-			call[0] = call[0] (i > 2 ? " " : "") call[i]
-		}
-		call[len] = ""
-
-		if (!reached_start && call["name"] !~ /(inc|var|start)/) {
-			logt("asdfsdf data before start call", 2)
-			return
-		}
-
-		#
-		# run the calls
-		#
-		if (call["name"] == "start")
-			ret = calls_start(call)
-		if (call["name"] == "e")
-			ret = calls_e(call)
-		if (call["name"] == "eo")
-			ret = calls_eo(call)
-		if (call["name"] == "exec_raw")
-			ret = calls_exec_raw(call)
-		if (call["name"] == "exec_fmt")
-			ret = calls_exec_fmt(call)
-		if (call["name"] == "var") {
-			ret = calls_var(call)
-		}
-
-		return ret
-	}
-
-	#
-	# skip extra newlines
-	#
-	if (str !~ /^([ \t]*|![^\[])$/)
+!/^==/ && !/^![^\[]/ {
+	if ($0 !~ /^[ \t]*$/)
 		reached_data = 1
-
 	if (!reached_data)
-		return
-
+		next
 	if (!reached_start) {
 		logt("skipping data before start call", 2)
-		return
+		next
 	}
 
 	if (c_vars["escape"])
-		str = escape_html(str)
+		$0 = escape_html($0)
 
-	str = md_fmt(str) "\n"
-	return str
+	$0 = md_fmt($0)
+
+	print $0
 }
 
-{
-	printf tegproc($0)
-}
+#
+# calls
+#
+/^![^\[]/ {
+	$0 = substr($0, 2)
+	call = $1
+	$1 = ""
+	sub(/^[ \t]+/, "", $0)
 
+	if (!reached_start && call !~ /(inc|var|start)/) {
+		logt("skipping data before start call", 2)
+		next
+	}
+
+	logt("!" call " " $0, 1)
+
+	#
+	# element
+	#
+	if (call == "e") {
+		elem_name = $1
+		elem_class = ($2 ? $2 : "def")
+		$1 = ""
+		$2 = ""
+		elem_props = $0
+		sub(/^[ \t]+/, "", elem_props)
+
+		if (!elems[elem_name "_" elem_class]) {
+			logt("new element: '" elem_name "'")
+			elems[elem_name "_" elem_class] = 1
+			nest_lvl ++
+			printf("<%s%s%s>\n",
+				elem_name,
+				(elem_class == "def" ? "" : " class=\"" elem_class "\""),
+				(elem_props  ? " " elem_props : ""))
+		} else {
+			logt("closing element: '" elem_name "'")
+			elems[elem_name "_" elem_class] = 0
+			nest_lvl --
+			print "</" elem_name ">"
+		}
+	#
+	# element one shot (for self closing tags)
+	#
+	} else if (call == "eo") {
+		elem_name = $1
+		elem_class = ($2 ? $2 : "def")
+		$1 = ""
+		$2 = ""
+		elem_props = $0
+		sub(/^[ \t]+/, "", elem_props)
+
+		printf("<%s%s%s>\n",
+			elem_name,
+			(elem_class == "def" ? "" : " class=\"" elem_class "\""),
+			(elem_props  ? " " elem_props : ""))
+	#
+	# place the head part of the website
+	#
+	} else if (call == "start") {
+		if (reached_start)
+			next
+		print "<!DOCTYPE html>"
+		print "<!-- Generated with teg: https://github.com/9vlc/teg -->"
+		print "<html lang=\"" c_vars["lang"] "\">"
+		print "<head>"
+		print "\t<meta charset=\"UTF-8\">"
+		print "\t<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
+
+		if (c_vars["title"])
+			print "\t<title>" c_vars["title"] "</title>"
+
+		if (c_vars["description"])
+			print "\t<meta name=\"description\" content=\"" c_vars["description"] "\">"
+
+		if (c_vars["color_chrome"])
+			print "\t<meta name=\"theme-color\" content=\"" c_vars["color_chrome"] "\">"
+
+		if (c_vars["icon"])
+			print "\t<link rel=\"icon\" href=\"" c_vars["icon"] "\">"
+
+		if (c_vars["style"])
+			print "\t<link rel=\"stylesheet\" type=\"text/css\" href=\"" c_vars["style"] "\">"
+
+		if (c_vars["style_inline"]) {
+			logt("starting inline style")
+			logt("style file: '" relpath(c_vars["style_inline"]) "'")
+			if (exists(relpath(c_vars["style_inline"]))) {
+				print "\t<style>"
+				while (getline line < relpath(c_vars["style_inline"]) > 0)
+					print line
+				print "\t</style>"
+				close(c_vars["style_inline"])
+			} else
+				logt("style file '" relpath(c_vars["style_inline"]) "' does not exist", 2)
+		}
+
+		if (c_vars["script"])
+			print "\t<script src=\"" c_vars["script"] "\">"
+
+		if (c_vars["script_inline"]) {
+			logt("starting inline script")
+			logt("script file: '" relpath(c_vars["script_inline"]) "'")
+			if (exists(relpath(c_vars["script_inline"]))) {
+				print "\t<script>"
+				while (getline line < relpath(c_vars["script_inline"]) > 0)
+					print line
+				print "\t</script>"
+				close(c_vars["script_inline"])
+			} else
+				logt("script file '" relpath(c_vars["script_inline"]) "' does not exist", 2)
+		}
+
+		print "</head>"
+		print "<body>"
+		reached_start = 1
+	#
+	# raw command output
+	#
+	} else if (call == "exec_raw") {
+		cmd = $0
+		while((cmd | getline line) > 0)
+			print line
+		close(cmd)
+	#
+	# codeblock command output
+	#
+	} else if (call == "exec_fmt") {
+		cmd = $0
+		printf("<pre class=\"cb\"><code class=\"cb\">")
+		while((cmd | getline line) > 0) {
+			print escape_html(line)
+		}
+		close(cmd)
+		printf("</code></pre>")
+		# don't add a newline that may appear after the codeblock
+		prev_str = "<br"
+	#
+	# include a file
+	#
+	} else if (call == "inc") {
+		logt("includes not implemented", 2)
+		next
+	#
+	# set a variable
+	#
+	} else if (call == "var") {
+		match($0, /[^=]+/)
+		key = substr($0, 1, RLENGTH)
+		sub(/^[ \t]+/, "", key)
+		value = substr($0, RLENGTH + 2)
+		if (value ~ /^-?[0-9]+$/)
+			c_vars[key] = value + 0
+		else
+			c_vars[key] = value
+
+		logt("'"key"' = ""'"value"'")
+	}
+}
 
 END {
 	if (reached_start) {

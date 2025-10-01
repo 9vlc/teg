@@ -1,13 +1,12 @@
 == set value of "variable" to "value"
-== to be used for development and some calls
 !var variable=value
 
 == start of the website
-== puts head and body
 !start
 
 == include "file.proto" at this point
 == works like include in any other programming language
+== NOT IMPLEMENTED
 !inc file.proto
 
 == run a command and paste its output
@@ -17,18 +16,23 @@
 == (<code> inside <pre>)
 !exec_fmt command
 
-== put an element
-== div, body, etc.
-!e name [class] [properties]
+== put an element (html tag)
+!e name class properties
 
 == elements open and close in relation to their classes
-== an example:
+== example:
 
 !e div box1
-!e div box2
+!e div box2 style="color:#fff;"
 text inside box2
 !e div box2
 and text inside box1 after box2
 !e div box1
 
-!e body
+== put an element (don't store state, for self closing tags.)
+!eo name class properties
+
+== example:
+!eo hr
+
+

@@ -1,5 +1,5 @@
-==!var title=test page
-==!var style_inline=ext/style.css
+!var title=test page
+!var style_inline=ext/style.css
 !start
 
 # Heyyyy
