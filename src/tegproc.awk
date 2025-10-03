@@ -33,19 +33,20 @@
 
 BEGIN {
 	if (ARGC <= 1)
-		file = "stdin"
+		c_vars["file"] = "stdin"
 	else
-		file = ARGV[1]
+		c_vars["file"] = ARGV[1]
 
+	skip_br = 0
 	reached_data = 0
 	reached_start = 0
 	inside_codeblock = 0
 	blockquote_lvl[0] = 0
 	blockquote_lvl[1] = 0
-	prev_str = "<hnull"
+	prev_str = "<h do not change this"
 
 	c_vars["escape"] = 1
-	c_vars["title"] = file
+	c_vars["title"] = c_vars["file"]
 	c_vars["description"] = 0
 	c_vars["lang"] = "en-US"
 	c_vars["icon"] = 0
@@ -55,13 +56,22 @@ BEGIN {
 	c_vars["script_inline"] = 0
 	c_vars["color_chrome"] = 0
 	c_vars["debug"] = 1
+	c_vars["exit_on_error"] = 1
+}
 
+function is_null(str) {
+	if (str ~ /^[ \t]*$/)
+		return 1
+	else
+		return 0
 }
 
 #
 # does this file exist?
 #
 function exists(file,   r) {
+	if (is_null(file))
+		return 0
 	r = getline _ < file
 	close(file)
 	return (r > -1 ? 1 : 0)
@@ -72,9 +82,9 @@ function exists(file,   r) {
 # currently worked on file's path
 #
 function relpath(path,   dir) {
-	if (match(path, /^\//) || file == "stdio")
+	if (match(path, /^\//) || c_vars["file"] == "stdio")
 		return path
-	dir = file
+	dir = c_vars["file"]
     sub(/[^\/]*$/, "", dir)
 	return dir path
 }
@@ -87,15 +97,18 @@ function relpath(path,   dir) {
 # 3 - error
 #
 function logt(txt, type) {
-	if (type == 1 || !type)
+	if (type == 1 || !type) {
 		if (c_vars["debug"])
 			print "debug: " txt > "/dev/stderr"
 		else
 			return 1
-	if (type == 2)
+	} else if (type == 2) {
 		print "warning: " txt > "/dev/stderr"
-	if (type == 3)
-		{ print "error: " txt > "/dev/stderr"; exit 1 }
+	} else if (type == 3) {
+		print "error: " txt > "/dev/stderr"
+		if (c_vars["exit_on_error"])
+			exit c_vars["exit_on_error"]
+	}
 	return 0
 }
 
@@ -120,7 +133,6 @@ function escape_html(str) {
 #
 function md_resurround(str, elem, regexp, flen,   start,mid,end) {
 	while (i = match(str, regexp)) {
-		logt(str)
 		start = substr(str, 1, i - 1)
 		mid = substr(str, i + flen, RLENGTH - 2 * flen)
 		end = substr(str, i + RLENGTH)
@@ -130,7 +142,7 @@ function md_resurround(str, elem, regexp, flen,   start,mid,end) {
 }
 
 #
-# a function no one wanted yet here it is
+# temporary function?
 #
 function md_resurround_wrap(str) {
 	#
@@ -149,7 +161,7 @@ function md_resurround_wrap(str) {
 # stores a whole bunch of global variables, call this for each line you
 # want to convert from markdown to html
 #
-function md_fmt(str) {
+function tegmd_fmt(str) {
 	#
 	# codeblocks
 	#
@@ -234,10 +246,11 @@ function md_fmt(str) {
 	#
 	# add br if there's two consecutive \n
 	#
-	if (str ~ /^$/ && prev_str !~ /(<\/?h[1-6]|<br)/) {
-		str = "<br class=\"nl\">"
-		logt(prev_str)
-	}
+	if (str ~ /^$/ && prev_str !~ /(<\/?h[1-6]|<br)/)
+		if (skip_br < 1)
+			str = "<br class=\"nl\">"
+		else
+			skip_br --
 
 	#
 	# links and images
@@ -256,11 +269,6 @@ function md_fmt(str) {
 		start = substr(str, 1, ix - 1)
 		end = substr(str, ix + rl)
 
-		logt("s: '" start "'")
-		logt("t: '" text "'")
-		logt("l: '" link "'")
-		logt("e: '" end "'")
-
 		if (is_image)
 			str = substr(start, 1, length(start) - 1) "<img alt=\""text"\" src=\""link"\">" end
 		else
@@ -274,18 +282,12 @@ function md_fmt(str) {
 	while (ix = match(str, /\|\|\[[^\]]*\][^\|]*\|\|/)) {
 		rl = RLENGTH
 		spoiler_md = substr(str, ix, rl)
-		logt("m: " spoiler_md)
 
 		preview = substr(spoiler_md, 4, index(spoiler_md, "]") - 4)
 		text = substr(spoiler_md, length(preview) + 5, rl - length(preview) - 6)
 
 		start = substr(str, 1, ix - 1)
 		end = substr(str, ix + rl)
-
-		logt("s: '" start "'")
-		logt("p: '" preview "'")
-		logt("t: '" text "'")
-		logt("e: '" end "'")
 
 		str = start "<details><summary>" preview "</summary>" text "</details>" end
 	}
@@ -356,6 +358,7 @@ function calls_start(call,   str,line) {
 
 	if (reached_start)
 		return
+
 	str = str     "<!DOCTYPE html>"
 	str = str"\n" "<!-- Generated with teg: https://github.com/9vlc/teg -->"
 	str = str"\n" "<html lang=\"" c_vars["lang"] "\">"
@@ -380,15 +383,17 @@ function calls_start(call,   str,line) {
 
 	if (c_vars["style_inline"]) {
 		logt("starting inline style")
-		logt("style file: '" relpath(c_vars["style_inline"]) "'")
-		if (exists(relpath(c_vars["style_inline"]))) {
+		style_file = relpath(c_vars["style_inline"])
+		logt("style file: '" style_file "'")
+
+		if (exists(style_file)) {
 			str = str"\n" "\t<style>"
-			while (getline line < relpath(c_vars["style_inline"]) > 0)
+			while ((getline line < style_file) > 0)
 				str = str"\n" line
 			str = str"\n" "\t</style>"
-			close(c_vars["style_inline"])
+			close(style_file)
 		} else
-			logt("style file '" relpath(c_vars["style_inline"]) "' does not exist", 2)
+			logt("style file '" style_file "' does not exist", 2)
 	}
 
 	if (c_vars["script"])
@@ -396,15 +401,17 @@ function calls_start(call,   str,line) {
 
 	if (c_vars["script_inline"]) {
 		logt("starting inline script")
-		logt("script file: '" relpath(c_vars["script_inline"]) "'")
-		if (exists(relpath(c_vars["script_inline"]))) {
+		script_file = relpath(c_vars["script_inline"])
+		logt("script script_file: '" script_file "'")
+
+		if (exists(script_file)) {
 			str = str"\n" "\t<script>"
-			while (getline line < relpath(c_vars["script_inline"]) > 0)
+			while ((getline line < script_file) > 0)
 				str = str"\n" line
 			str = str"\n" "\t</script>"
-			close(c_vars["script_inline"])
+			close(script_file)
 		} else
-			logt("script file '" relpath(c_vars["script_inline"]) "' does not exist", 2)
+			logt("script file '" relpath(c_vars["script_inline"]) "' does not exist", 3)
 	}
 
 	reached_start = 1
@@ -420,6 +427,11 @@ function calls_start(call,   str,line) {
 #
 function calls_exec_raw(call,   str,line) {
 	str = ""
+	if (is_null(call[0])) {
+		logt("empty !exec_raw command", 3)
+		return
+	}
+
 	while((call[0] | getline line) > 0)
 		str = (str ? str "\n" : "") line
 	close(call[0])
@@ -434,12 +446,17 @@ function calls_exec_raw(call,   str,line) {
 #
 function calls_exec_fmt(call,   str,line) {
 	str = ""
+	if (is_null(call[0])) {
+		logt("empty !exec_fmt command", 3)
+		return
+	}
+
 	while((call[0] | getline line) > 0) {
 		str = (str ? str "\n" : "") escape_html(line)
 	}
 	close(call[0])
 	# make the markdown formatter not add a break after code
-	prev_str = "<br"
+	prev_str = "<h"
 
 	return "<pre class=\"cb\"><code class=\"cb\">" str "</code></pre>"
 }
@@ -473,7 +490,39 @@ function calls_var(call,   eqpos,key,value) {
 # include a file
 # this was the most difficult call to implement
 #
-function calls_inc(call) {
+function calls_inc(call,   inc_file,line,prev_file) {
+	logt("including '" call[0] "'")
+	inc_file = relpath(call[0])
+
+	if (!exists(inc_file)) {
+		logt("teg file '" inc_file "' does not exist", 3)
+		return
+	}
+
+	str = ""
+	prev_str = "<h"
+	prev_file = c_vars["file"]
+	c_vars["file"] = inc_file
+	skip_br += 2
+
+	while ((getline line < inc_file) > 0)
+		str = str tegproc(line)
+	close(inc_file)
+
+	c_vars["file"] = prev_file
+	return str
+}
+
+#
+# skip following N line breaks
+#
+function calls_nobr(call) {
+	if (call[1] !~ /^[0-9]+$/) {
+		logt("not a number passed to !nobr", 3)
+		return
+	}
+
+	skip_br = call[1]
 	return
 }
 
@@ -494,9 +543,7 @@ function tegproc(str) {
 		# call[1+] - args, split
 		#
 
-		str = substr(str, 2)
-		len = split(str, call, " ")
-
+		len = split(substr(str, 2), call, " ")
 		call["name"] = call[1]
 		for (i = 2; i <= len; i++) {
 			call[i - 1] = call[i]
@@ -505,13 +552,14 @@ function tegproc(str) {
 		call[len] = ""
 
 		if (!reached_start && call["name"] !~ /(inc|var|start)/) {
-			logt("asdfsdf data before start call", 2)
+			logt("skipping data before start call", 2)
 			return
 		}
 
 		#
 		# run the calls
 		#
+		ret = str # default: the string
 		if (call["name"] == "start")
 			ret = calls_start(call)
 		if (call["name"] == "e")
@@ -522,9 +570,12 @@ function tegproc(str) {
 			ret = calls_exec_raw(call)
 		if (call["name"] == "exec_fmt")
 			ret = calls_exec_fmt(call)
-		if (call["name"] == "var") {
+		if (call["name"] == "var")
 			ret = calls_var(call)
-		}
+		if (call["name"] == "inc")
+			ret = calls_inc(call)
+		if (call["name"] == "nobr")
+			ret = calls_nobr(call)
 
 		return ret
 	}
@@ -546,7 +597,7 @@ function tegproc(str) {
 	if (c_vars["escape"])
 		str = escape_html(str)
 
-	str = md_fmt(str) "\n"
+	str = tegmd_fmt(str) "\n"
 	return str
 }
 

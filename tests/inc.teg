@@ -1,0 +1,9 @@
+!var title=testtt
+!start
+
+The following is going to be a Markdown test.
+---
+!inc markdown.teg
+---
+And now onto our main topic:
+*i don't know*
