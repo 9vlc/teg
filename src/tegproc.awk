@@ -37,7 +37,6 @@ BEGIN {
 	else
 		c_vars["file"] = ARGV[1]
 
-	skip_br = 0
 	reached_data = 0
 	reached_start = 0
 	inside_codeblock = 0
@@ -57,6 +56,7 @@ BEGIN {
 	c_vars["color_chrome"] = 0
 	c_vars["debug"] = 1
 	c_vars["exit_on_error"] = 1
+	c_vars["nobr"] = 0
 }
 
 #
@@ -258,11 +258,8 @@ function tegmd_fmt(str) {
 	#
 	# add br if there's two consecutive \n
 	#
-	if (str ~ /^$/ && prev_str !~ /(<\/?h[1-6]|<br)/)
-		if (skip_br < 1)
-			str = "<br class=\"nl\">"
-		else
-			skip_br --
+	if (str ~ /^$/ && prev_str !~ /(<\/?h[1-6]|<br)/ && c_vars["nobr"] < 1)
+		str = "<br class=\"nl\">"
 
 	#
 	# links and images
@@ -521,7 +518,7 @@ function MARK(opt_txt) {
 # include a file
 # this was the most difficult call to implement
 #
-function calls_inc(call,   inc_file,line,prev_file) {
+function calls_inc(call,   inc_file,line,prev_file,str) {
 	logt("including '" call[0] "'")
 	inc_file = relpath(call[0])
 
@@ -534,7 +531,6 @@ function calls_inc(call,   inc_file,line,prev_file) {
 	prev_str = "<h"
 	prev_file = c_vars["file"]
 	c_vars["file"] = inc_file
-	skip_br += 2
 
 	while ((getline line < inc_file) > 0) {
 		str = str tegproc(line)
@@ -543,32 +539,6 @@ function calls_inc(call,   inc_file,line,prev_file) {
 
 	c_vars["file"] = prev_file
 	return str
-}
-
-#
-# !nobr start/stop/N
-#
-# do not put N following line breaks
-# or completely stop them
-#
-function calls_nobr(call) {
-	if (call[1] == "start") {
-		#
-		# i don't think anyone would reach this amount of
-		# line breaks in their webpage.
-		#
-		skip_br = 100000000
-		return
-	} else if (call[1] == "stop") {
-		skip_br = 0
-		return
-	} else if (call[1] !~ /^[0-9]+$/) {
-		logt("not a number passed to !nobr", 3)
-		return
-	} else {
-		skip_br = call[1]
-		return
-	}
 }
 
 #
@@ -619,8 +589,6 @@ function tegproc(str) {
 			ret = calls_var(call)
 		if (call["name"] == "inc")
 			ret = calls_inc(call)
-		if (call["name"] == "nobr")
-			ret = calls_nobr(call)
 
 		return ret
 	}
