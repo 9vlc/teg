@@ -59,11 +59,23 @@ BEGIN {
 	c_vars["exit_on_error"] = 1
 }
 
+#
+# check if the string is empty / whitespace
+#
 function is_null(str) {
 	if (str ~ /^[ \t]*$/)
 		return 1
 	else
 		return 0
+}
+
+#
+# strip leading and trailing whitespace from a string
+#
+function strip_sp(str) {
+	gsub(/^[ \t]+/, "", str)
+	gsub(/[ \t]+$/, "", str)
+	return str
 }
 
 #
@@ -303,13 +315,22 @@ function tegmd_fmt(str) {
 # stores a list of elements in a global variable and
 # closes them when user calls the same element again
 #
-function calls_e(call,   elem_name,elem_class,elem_props) {
-	elem_name = call[$1]
-	elem_class = (call[2] ? call[2] : "def")
+function calls_e(call,   elem_name,elem_class,elem_props,arg_count) {
+	elem_name = call[1]
+	elem_class = (call[2] ? call[2] : "_")
+	arg_count = 0
+	for (elem_props in call)
+		arg_count ++
 
-	for (i = 3; i <= length(call); i++)
+	elem_props = ""
+	for (i = 3; i <= arg_count; i++) {
 		elem_props = elem_props (i > 3 ? " " : "") call[i]
+	}
 	sub(/^[ \t]+/, "", elem_props)
+
+	elem_name = strip_sp(elem_name)
+	elem_class = strip_sp(elem_class)
+	elem_props = strip_sp(elem_props)
 
 	if (!elems[elem_name "_" elem_class]) {
 		logt("new element: '" elem_name "'")
@@ -317,7 +338,7 @@ function calls_e(call,   elem_name,elem_class,elem_props) {
 		elem_nest_lvl ++
 		return sprintf("<%s%s%s>\n",
 			elem_name,
-			(elem_class == "def" ? "" : " class=\"" elem_class "\""),
+			(elem_class == "_" ? "" : " class=\"" elem_class "\""),
 			(elem_props  ? " " elem_props : ""))
 	} else {
 		logt("closing element: '" elem_name "'")
@@ -485,6 +506,16 @@ function calls_var(call,   eqpos,key,value) {
 }
 
 #
+# debug
+#
+function MARK(opt_txt) {
+	c_vars["marker_num"] = (c_vars["marker_num"] ? c_vars["marker_num"] : 1)
+	logt("MARKER " c_vars["marker_num"] (opt_txt ? " / " opt_txt : ""))
+	c_vars["marker_num"] ++
+	return
+}
+
+#
 # !inc file
 #
 # include a file
@@ -505,8 +536,9 @@ function calls_inc(call,   inc_file,line,prev_file) {
 	c_vars["file"] = inc_file
 	skip_br += 2
 
-	while ((getline line < inc_file) > 0)
+	while ((getline line < inc_file) > 0) {
 		str = str tegproc(line)
+	}
 	close(inc_file)
 
 	c_vars["file"] = prev_file
@@ -602,7 +634,7 @@ function tegproc(str) {
 }
 
 {
-	printf tegproc($0)
+	printf("%s", tegproc($0))
 }
 
 
