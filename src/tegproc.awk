@@ -546,16 +546,29 @@ function calls_inc(call,   inc_file,line,prev_file) {
 }
 
 #
-# skip following N line breaks
+# !nobr start/stop/N
+#
+# do not put N following line breaks
+# or completely stop them
 #
 function calls_nobr(call) {
-	if (call[1] !~ /^[0-9]+$/) {
+	if (call[1] == "start") {
+		#
+		# i don't think anyone would reach this amount of
+		# line breaks in their webpage.
+		#
+		skip_br = 100000000
+		return
+	} else if (call[1] == "stop") {
+		skip_br = 0
+		return
+	} else if (call[1] !~ /^[0-9]+$/) {
 		logt("not a number passed to !nobr", 3)
 		return
+	} else {
+		skip_br = call[1]
+		return
 	}
-
-	skip_br = call[1]
-	return
 }
 
 #
