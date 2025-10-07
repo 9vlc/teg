@@ -42,6 +42,8 @@ BEGIN {
 	inside_codeblock = 0
 	blockquote_lvl[0] = 0
 	blockquote_lvl[1] = 0
+	list_lvl[0] = 0
+	list_lvl[1] = 0
 	prev_str = "<h do not change this"
 
 	c_vars["escape"] = 1
@@ -174,6 +176,9 @@ function md_resurround_wrap(str) {
 # want to convert from markdown to html
 #
 function tegmd_fmt(str) {
+	match(str, /^[ \t]*/)
+	indent_len = RLENGTH
+
 	#
 	# codeblocks
 	#
@@ -220,13 +225,13 @@ function tegmd_fmt(str) {
 	#
 	# current depth
 	#
-	if (str ~ /^>+/) {
+	blockquote_lvl[0] = 0
+	if (str ~ /^>+ /) {
 		match(str, /^>+/)
 		blockquote_lvl[0] = RLENGTH
     	if (blockquote_lvl[0] > 0)
     		str = substr(str, blockquote_lvl[0] + 2)
-	} else
-		blockquote_lvl[0] = 0
+	}
 	#
 	# depth increases
 	#
@@ -245,14 +250,49 @@ function tegmd_fmt(str) {
 	#
 	# depth stays the same
 	#
-	} else {
-		if (str ~ /^$/ && blockquote_lvl[0] > 0)
-			str = "<br class=\"nl-bq\">"
-	}
-	str = blockstr str
+	} else if (str ~ /^$/ && blockquote_lvl[0] > 0)
+		 str = "<br class=\"nl-bq\">"
+	if (!is_null(blockstr))
+		str = blockstr str
 	blockquote_lvl[1] = blockquote_lvl[0]
 	#
 	# blockquotes end
+	#
+
+	#
+	# lists
+	#
+	list_type[0] = 0
+	if (match(str, /^[ \t]*- /))
+		list_type[0] = 1
+	else if (match(str, /^[ \t]*[0-9]+\. /))
+		list_type[0] = 2
+
+	if (str ~ /^[ \t]*(-|[0-9]+\.) /) {
+		list_lvl[0] = indent_len / 2 + 1
+		str = substr(str, RLENGTH + 1)
+	}
+
+	if (list_type[0] && !list_type[1]) {
+		str = (list_type[0] == 1 ? "<ul>" : "<ol>") (str ? "<li>" str "</li>" : "")
+	} else if (!list_type[0] && list_type[1]) {
+		str = (list_type[1] == 1 ? "</ul>" : "</ol>") str
+	} else if (list_type[0] && list_type[1]) {
+
+		if (list_lvl[0] > list_lvl[1])
+			str = (list_type[0] == 1 ? "<ul>" : "<ol>") (str ? "<li>" str "</li>" : "")
+		else if (list_lvl[0] < list_lvl[1])
+			str = (list_type[1] == 1 ? "</ul>" : "</ol>") (str ? "<li>" str "</li>" : "")
+		else if (list_type[0] != list_type[1])
+			str = (list_type[1] == 1 ? "</ul>" : "</ol>") (list_type[0] == 1 ? "<ul>" : "<ol>") (str ? "<li>" str "</li>" : "")
+		else
+			str = "<li>" str "</li>"
+	}
+
+	list_type[1] = list_type[0]
+	list_lvl[1] = list_lvl[0]
+	#
+	# lists end
 	#
 
 	#
@@ -351,17 +391,27 @@ function calls_e(call,   elem_name,elem_class,elem_props,arg_count) {
 # same as before, just don't remember the state
 # meant for self-closing tags
 #
-function calls_eo(call,   elem_name,elem_class,elem_props) {
-	elem_name = call[$1]
-	elem_class = (call[2] ? call[2] : "def")
+function calls_eo(call,   elem_name,elem_class,elem_props,arg_count) {
+	elem_name = call[1]
+	elem_class = (call[2] ? call[2] : "_")
+	arg_count = 0
+	for (elem_props in call)
+		arg_count ++
 
-	for (i = 3; i <= length(call); i++)
+	elem_props = ""
+	for (i = 3; i <= arg_count; i++) {
 		elem_props = elem_props (i > 3 ? " " : "") call[i]
+	}
 	sub(/^[ \t]+/, "", elem_props)
 
+	elem_name = strip_sp(elem_name)
+	elem_class = strip_sp(elem_class)
+	elem_props = strip_sp(elem_props)
+
+	logt("new oneshot element: '" elem_name "'")
 	return sprintf("<%s%s%s>\n",
 		elem_name,
-		(elem_class == "def" ? "" : " class=\"" elem_class "\""),
+		(elem_class == "_" ? "" : " class=\"" elem_class "\""),
 		(elem_props  ? " " elem_props : ""))
 }
 
@@ -620,6 +670,7 @@ function tegproc(str) {
 
 
 END {
+	tegproc("") # finish all our markdown things
 	if (reached_start) {
 		print "</body>"
 		print "</html>"
