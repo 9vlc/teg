@@ -226,7 +226,7 @@ function tegmd_fmt(str) {
 	# current depth
 	#
 	blockquote_lvl[0] = 0
-	if (str ~ /^>+ /) {
+	if (str ~ /^>+/) {
 		match(str, /^>+/)
 		blockquote_lvl[0] = RLENGTH
     	if (blockquote_lvl[0] > 0)
