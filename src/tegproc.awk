@@ -44,8 +44,10 @@ BEGIN {
 	blockquote_lvl[1] = 0
 	list_lvl[0] = 0
 	list_lvl[1] = 0
+	# this serves a different purpose than prev_line.
 	prev_str = "<h do not change this"
 
+	c_vars["teg"] = ARGV[0]
 	c_vars["escape"] = 1
 	c_vars["title"] = c_vars["file"]
 	c_vars["description"] = 0
@@ -59,6 +61,8 @@ BEGIN {
 	c_vars["debug"] = 1
 	c_vars["exit_on_error"] = 1
 	c_vars["nobr"] = 0
+	c_vars["nobr_once"] = 0
+	c_vars["prev_line"] = ""
 }
 
 #
@@ -127,6 +131,16 @@ function logt(txt, type) {
 }
 
 #
+# logt wrapper for debugging where did an error occur
+#
+function MARK(opt_txt) {
+	c_vars["marker_num"] = (c_vars["marker_num"] ? c_vars["marker_num"] : 1)
+	logt("MARKER " c_vars["marker_num"] (opt_txt ? " / " opt_txt : ""))
+	c_vars["marker_num"] ++
+	return
+}
+
+#
 # escape symbols like & < > " '
 #
 function escape_html(str) {
@@ -146,10 +160,10 @@ function escape_html(str) {
 # flen - length of one of the sides of the surround (DO NOT OMMIT!!!!!!)
 #
 function md_resurround(str, elem, regexp, flen,   start,mid,end) {
-	while (i = match(str, regexp)) {
-		start = substr(str, 1, i - 1)
-		mid = substr(str, i + flen, RLENGTH - 2 * flen)
-		end = substr(str, i + RLENGTH)
+	while (match(str, regexp)) {
+		start = substr(str, 1, RSTART - 1)
+		mid = substr(str, RSTART + flen, RLENGTH - 2 * flen)
+		end = substr(str, RSTART + RLENGTH)
 		str = start "<"elem">" mid "</"elem">" end
 	}
 	return str
@@ -175,7 +189,7 @@ function md_resurround_wrap(str) {
 # stores a whole bunch of global variables, call this for each line you
 # want to convert from markdown to html
 #
-function tegmd_fmt(str) {
+function md_fmt(str) {
 	match(str, /^[ \t]*/)
 	indent_len = RLENGTH
 
@@ -183,6 +197,8 @@ function tegmd_fmt(str) {
 	# codeblocks
 	#
 	if (inside_codeblock) {
+		if (inside_codeblock == 3)
+			return
 		if (inside_codeblock == 2) {
 			inside_codeblock = 1
 			return "<pre class=\"cb\"><code class=\"cb\">" str
@@ -278,7 +294,6 @@ function tegmd_fmt(str) {
 	} else if (!list_type[0] && list_type[1]) {
 		str = (list_type[1] == 1 ? "</ul>" : "</ol>") str
 	} else if (list_type[0] && list_type[1]) {
-
 		if (list_lvl[0] > list_lvl[1])
 			str = (list_type[0] == 1 ? "<ul>" : "<ol>") (str ? "<li>" str "</li>" : "")
 		else if (list_lvl[0] < list_lvl[1])
@@ -298,13 +313,14 @@ function tegmd_fmt(str) {
 	#
 	# add br if there's two consecutive \n
 	#
-	if (str ~ /^$/ && prev_str !~ /(<\/?h[1-6]|<br)/ && c_vars["nobr"] < 1)
+	if (str ~ /^$/ && prev_str !~ /<\/?(h|ul|ol|pre|br|p)/ && !c_vars["nobr"] && !c_vars["nobr_once"])
 		str = "<br class=\"nl\">"
+	c_vars["nobr_once"] = 0
 
 	#
 	# links and images
 	#
-	while (ix = match(str, /\[[^\]]*\]\([^)]*\)/)) {
+	while (ix = match(str, /\[[^\]]*\]\([^)]*[^\\]\)/)) {
 		is_image = 0
 		rl = RLENGTH
 		link_md = substr(str, ix, rl)
@@ -314,6 +330,7 @@ function tegmd_fmt(str) {
 
 		text = substr(link_md, 2, index(link_md, "]") - 2)
 		link = substr(link_md, length(text) + 4, rl - length(text) - 4)
+		gsub(/\\\)/, ")", link)
 
 		start = substr(str, 1, ix - 1)
 		end = substr(str, ix + rl)
@@ -409,7 +426,7 @@ function calls_eo(call,   elem_name,elem_class,elem_props,arg_count) {
 	elem_props = strip_sp(elem_props)
 
 	logt("new oneshot element: '" elem_name "'")
-	return sprintf("<%s%s%s>\n",
+	return sprintf("<%s%s%s>",
 		elem_name,
 		(elem_class == "_" ? "" : " class=\"" elem_class "\""),
 		(elem_props  ? " " elem_props : ""))
@@ -519,12 +536,21 @@ function calls_exec_fmt(call,   str,line) {
 		return
 	}
 
+	inside_codeblock = 3
 	while((call[0] | getline line) > 0) {
 		str = (str ? str "\n" : "") escape_html(line)
+		if (inside_codeblock == 2) {
+			inside_codeblock = 1
+			return "<pre class=\"cb\"><code class=\"cb\">" str
+		} else if (str == "```") {
+			inside_codeblock = 0
+			return "</code></pre>"
+		}
 	}
 	close(call[0])
 	# make the markdown formatter not add a break after code
 	prev_str = "<h"
+	inside_codeblock = 0
 
 	return "<pre class=\"cb\"><code class=\"cb\">" str "</code></pre>"
 }
@@ -549,16 +575,7 @@ function calls_var(call,   eqpos,key,value) {
 		c_vars[key] = value
 
 	logt("'"key"' = ""'"value"'")
-	return
-}
-
-#
-# debug
-#
-function MARK(opt_txt) {
-	c_vars["marker_num"] = (c_vars["marker_num"] ? c_vars["marker_num"] : 1)
-	logt("MARKER " c_vars["marker_num"] (opt_txt ? " / " opt_txt : ""))
-	c_vars["marker_num"] ++
+	c_vars["nobr_once"] = 1
 	return
 }
 
@@ -592,75 +609,115 @@ function calls_inc(call,   inc_file,line,prev_file,str) {
 }
 
 #
-# everything
+# run a call
 #
-function tegproc(str) {
-	if (str ~ /^==/)
-		return
-
-	#
-	# calls
-	#
-	if (str ~ /^![^\[]/) {
-		#
-		# what we got:
-		# call[0]  - args, concat
-		# call[1+] - args, split
-		#
-
+# call["name"] - call name
+# call[0]      - concat args
+# call[1+]     - args
+#
+function callproc(str, explicit,   len) {
+	explicit = (explicit ? 1 : 0)
+	if (str ~ /^![^\[]/)
 		len = split(substr(str, 2), call, " ")
-		call["name"] = call[1]
-		for (i = 2; i <= len; i++) {
-			call[i - 1] = call[i]
-			call[0] = call[0] (i > 2 ? " " : "") call[i]
-		}
-		call[len] = ""
+	else if (explicit)
+		len = split(str, call, " ")
+	else
+		return str
 
-		if (!reached_start && call["name"] !~ /(inc|var|start)/) {
-			logt("skipping data before start call", 2)
-			return
-		}
-
-		#
-		# run the calls
-		#
-		ret = str # default: the string
-		if (call["name"] == "start")
-			ret = calls_start(call)
-		if (call["name"] == "e")
-			ret = calls_e(call)
-		if (call["name"] == "eo")
-			ret = calls_eo(call)
-		if (call["name"] == "exec_raw")
-			ret = calls_exec_raw(call)
-		if (call["name"] == "exec_fmt")
-			ret = calls_exec_fmt(call)
-		if (call["name"] == "var")
-			ret = calls_var(call)
-		if (call["name"] == "inc")
-			ret = calls_inc(call)
-
-		return ret
+	call["name"] = call[1]
+	for (i = 2; i <= len; i++) {
+		call[i - 1] = call[i]
+		call[0] = call[0] (i > 2 ? " " : "") call[i]
 	}
 
-	#
-	# skip extra newlines
-	#
-	if (str !~ /^([ \t]*|![^\[])$/)
-		reached_data = 1
-
-	if (!reached_data)
-		return
-
-	if (!reached_start) {
+	if (!reached_start && !explicit && call["name"] !~ /(inc|var|start)/) {
 		logt("skipping data before start call", 2)
 		return
 	}
 
-	if (c_vars["escape"])
+	if (call["name"] == "start")
+		str = calls_start(call)
+	if (call["name"] == "e")
+		str = calls_e(call)
+	if (call["name"] == "eo")
+		str = calls_eo(call)
+	if (call["name"] == "exec_raw")
+		str = calls_exec_raw(call)
+	if (call["name"] == "exec_fmt")
+		str = calls_exec_fmt(call)
+	if (call["name"] == "var")
+		str = calls_var(call)
+	if (call["name"] == "inc")
+		str = calls_inc(call)
+
+	return str
+}
+
+#
+# expand inline variables and calls
+# inline variable: {$var_name$}
+# inline call: {!call_name!}
+#
+function expand_inline(str,   start,mid,end) {
+	#
+	# first expand all the variables
+	#
+	while (match(str, /\{\$[^{$]+\$\}/)) {
+		logt("--------------------------")
+		logt("what\t\"" str "\"")
+
+		start = substr(str, 1, RSTART - 1)
+		mid = c_vars[substr(str, RSTART + 2, RLENGTH - 4)]
+		end = substr(str, RSTART + RLENGTH)
+		str = start mid end
+
+		logt("start\t\"" start "\"")
+		logt("mid\t\"" mid "\"")
+		logt("end\t\"" end "\"")
+		logt("str\t\"" str "\"")
+	}
+
+	#
+	# then run all inline calls
+	#
+	while (match(str, /\{![^{!]+!\}/)) {
+		start = substr(str, 1, RSTART - 1)
+		mid = callproc(substr(str, RSTART + 2, RLENGTH - 4), 1)
+		end = substr(str, RSTART + RLENGTH)
+		str = start mid end
+	}
+
+	return str
+}
+
+#
+# everything
+#
+function tegproc(str) {
+	c_vars["prev_line"] = str
+
+	if (str ~ /^==/)
+		return
+
+	if (str !~ /^([ \t]*|![^\[])$/)
+		reached_data = 1
+
+	if (c_vars["escape"] && str !~ /\{\$.+\$\}/)
 		str = escape_html(str)
 
-	str = tegmd_fmt(str) "\n"
+	if (!inside_codeblock) {
+		str = expand_inline(str)
+		str = callproc(str)
+	}
+
+	if (!reached_data)
+		return
+	else if (!reached_start) {
+		logt("skipping data before start call", 2)
+		return
+	}
+
+	str = md_fmt(str) (c_vars["prev_line"] ~ /^[^!]/ ? "\n" : "")
 	return str
 }
 
@@ -670,7 +727,7 @@ function tegproc(str) {
 
 
 END {
-	tegproc("") # finish all our markdown things
+	md_fmt("")
 	if (reached_start) {
 		print "</body>"
 		print "</html>"

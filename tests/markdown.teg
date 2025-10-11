@@ -83,11 +83,29 @@ hello this is a [link](https://example.com) how cool
 
 > **bold**
 >
-> *italic 1*
+> *italic*
 >
 > __underscore__
 >
 > [link](https://example.com)
 
 # lists
-not implemented, not making a section for them here for now.
+
+- test
+- test2
+  - up one
+- and down
+
+1. one
+1. two
+1. three
+
+- we have:
+  1. one
+  1. two
+  1. three
+- and also
+  - this which has:
+    1. one
+    1. two
+    1. three
