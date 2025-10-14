@@ -1,6 +1,6 @@
-== markdown test
+== old markdown test
 
-!var style_inline=ext/style.css
+!var style_inline=style.css
 !start
 
 # headings / heading 1

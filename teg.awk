@@ -39,15 +39,11 @@ BEGIN {
 
 	reached_data = 0
 	reached_start = 0
-	inside_codeblock = 0
 	blockquote_lvl[0] = 0
 	blockquote_lvl[1] = 0
 	list_lvl[0] = 0
 	list_lvl[1] = 0
-	# this serves a different purpose than prev_line.
-	prev_str = "<h do not change this"
 
-	c_vars["teg"] = ARGV[0]
 	c_vars["escape"] = 1
 	c_vars["title"] = c_vars["file"]
 	c_vars["description"] = 0
@@ -60,19 +56,24 @@ BEGIN {
 	c_vars["color_chrome"] = 0
 	c_vars["debug"] = 1
 	c_vars["exit_on_error"] = 1
-	c_vars["nobr"] = 0
-	c_vars["nobr_once"] = 0
-	c_vars["prev_line"] = ""
+	c_vars["no_br"] = 0
+	c_vars["no_proc"] = 0
+	c_vars["current_line"] = ""
+	c_vars["prev_line"] = "<h"
+	c_vars["e_nest_lvl"] = 0
+	c_vars["inside_pre"] = 0
+	c_vars["inside_codeblock"] = 0
 }
 
 #
 # check if the string is empty / whitespace
 #
 function is_null(str) {
-	if (str ~ /^[ \t]*$/)
-		return 1
-	else
+	gsub(/[ \n\t]/, "", str)
+	if (length(str))
 		return 0
+	else
+		return 1
 }
 
 #
@@ -81,6 +82,19 @@ function is_null(str) {
 function strip_sp(str) {
 	gsub(/^[ \t]+/, "", str)
 	gsub(/[ \t]+$/, "", str)
+	return str
+}
+
+#
+# return an exploded array for debugging
+#
+function explode_arr(arr,   str,elem) {
+	str = "\t"
+	for (elem in arr) {
+		elem = elem " : \"" arr[elem] "\""
+		str = (str == "\t" ? "\t" elem : str "\n\t" elem)
+	}
+	str = str "\n"
 	return str
 }
 
@@ -100,7 +114,7 @@ function exists(file,   r) {
 # currently worked on file's path
 #
 function relpath(path,   dir) {
-	if (match(path, /^\//) || c_vars["file"] == "stdio")
+	if (match(path, /^\//) || c_vars["file"] == "stdin")
 		return path
 	dir = c_vars["file"]
     sub(/[^\/]*$/, "", dir)
@@ -157,37 +171,30 @@ function escape_html(str) {
 # str - input string
 # elem - html element to put match in
 # regexp - regex match for a symmetric surround of a word
-# flen - length of one of the sides of the surround (DO NOT OMMIT!!!!!!)
+# flen - length of one of the sides of the surround
+# alt - html escape replacement for the surround symbols
 #
-function md_resurround(str, elem, regexp, flen,   start,mid,end) {
+function md_resurround(str, elem, regexp, flen, alt,   start,mid,end,ralt) {
 	while (match(str, regexp)) {
 		start = substr(str, 1, RSTART - 1)
-		mid = substr(str, RSTART + flen, RLENGTH - 2 * flen)
+		mid = substr(str, RSTART + flen, RLENGTH - flen * 2)
 		end = substr(str, RSTART + RLENGTH)
-		str = start "<"elem">" mid "</"elem">" end
+
+		if (substr(str, RSTART - 1, 1) == "\\") {
+			start = substr(start, 1, length(start) - 1)
+			for (i = 0; i < flen; i++)
+				ralt = ralt alt
+			str = start ralt mid ralt end
+		} else
+			str = start "<"elem">" mid "</"elem">" end
 	}
 	return str
 }
 
-#
-# temporary function?
-#
-function md_resurround_wrap(str) {
-	#
-	# bold, italic, underscode, strikethrough, etc
-	#
-	str = md_resurround(str, "strong", "\\*\\*[^*]+\\*\\*", 2)
-	str = md_resurround(str, "em", "\\*[^*]+\\*", 1)
-	str = md_resurround(str, "u", "__[^_]+__", 2)
-	str = md_resurround(str, "s", "~~[^~]+~~", 2)
-	str = md_resurround(str, "code", "`[^`]+`", 1)
-	return str
-}
 
 #
-# whatever.
-# stores a whole bunch of global variables, call this for each line you
-# want to convert from markdown to html
+# markdown processor
+# call for each line and finish execution with one empty string and c_vars["no_br"] = 1
 #
 function md_fmt(str) {
 	match(str, /^[ \t]*/)
@@ -196,23 +203,30 @@ function md_fmt(str) {
 	#
 	# codeblocks
 	#
-	if (inside_codeblock) {
-		if (inside_codeblock == 3)
-			return
-		if (inside_codeblock == 2) {
-			inside_codeblock = 1
+	if (c_vars["inside_codeblock"]) {
+		if (c_vars["inside_codeblock"] == 2) {
+			c_vars["inside_codeblock"] = 1
+			c_vars["inside_pre"] = 1
 			return "<pre class=\"cb\"><code class=\"cb\">" str
 		} else if (str == "```") {
-			inside_codeblock = 0
+			c_vars["inside_codeblock"] = 0
+			c_vars["inside_pre"] = 0
 			return "</code></pre>"
 		}
 		return str
 	} else if (str == "```") {
-		inside_codeblock = 2
+		c_vars["inside_codeblock"] = 2
 		return
 	}
 
-	str = md_resurround_wrap(str)
+	#
+	# bold, italic, underscode, strikethrough, code
+	#
+	str = md_resurround(str, "strong", "\\*\\*[^*]+\\*\\*", 2, "&#42;")
+	str = md_resurround(str, "em", "\\*[^*]+\\*", 1, "&#42;")
+	str = md_resurround(str, "u", "__[^_]+__", 2, "&#95;")
+	str = md_resurround(str, "s", "~~[^~]+~~", 2, "&#126;")
+	str = md_resurround(str, "code", "`[^`]+`", 1, "&#96;")
 
 	#
 	# headings
@@ -233,8 +247,9 @@ function md_fmt(str) {
 	#
 	# horizontal rule
 	#
-	if (str ~ /^---+$/)
+	if (str ~ /^---+$/) {
 		str = "<hr>"
+	}
 
 	#
 	# blockquotes
@@ -256,17 +271,19 @@ function md_fmt(str) {
 		for (i = 0; i < blockquote_lvl[0] - blockquote_lvl[1]; i++)
 			blockstr = blockstr "<blockquote>"
 		blockstr = blockstr "<p>"
+	}
 	#
 	# depth decreases
 	#
-	} else if (blockquote_lvl[0] < blockquote_lvl[1]) {
+	if (blockquote_lvl[0] < blockquote_lvl[1]) {
 		blockstr = "</p>" blockstr
 		for (i = 0; i < blockquote_lvl[1] - blockquote_lvl[0]; i++)
 			blockstr = "</blockquote>" blockstr
+	}
 	#
 	# depth stays the same
 	#
-	} else if (str ~ /^$/ && blockquote_lvl[0] > 0)
+	if (str ~ /^$/ && blockquote_lvl[0] > 0)
 		 str = "<br class=\"nl-bq\">"
 	if (!is_null(blockstr))
 		str = blockstr str
@@ -285,24 +302,32 @@ function md_fmt(str) {
 		list_type[0] = 2
 
 	if (str ~ /^[ \t]*(-|[0-9]+\.) /) {
-		list_lvl[0] = indent_len / 2 + 1
+		start = substr(str, 1, indent_len)
+		gsub(/\t/, "  ", start)
+		list_lvl[0] = length(start) / 2 + 1
 		str = substr(str, RLENGTH + 1)
 	}
 
-	if (list_type[0] && !list_type[1]) {
+	# new list type?
+	if (list_type[0] && !list_type[1])
 		str = (list_type[0] == 1 ? "<ul>" : "<ol>") (str ? "<li>" str "</li>" : "")
-	} else if (!list_type[0] && list_type[1]) {
-		str = (list_type[1] == 1 ? "</ul>" : "</ol>") str
-	} else if (list_type[0] && list_type[1]) {
+	# closing a list
+	else if (!list_type[0] && list_type[1])
+		for (i = 0; i < list_lvl[1]; i++)
+			str = (list_type[1] == 1 ? "</ul>" : "</ol>") str
+	# continuing a list
+	else if (list_type[0] && list_type[1])
+		# going up
 		if (list_lvl[0] > list_lvl[1])
 			str = (list_type[0] == 1 ? "<ul>" : "<ol>") (str ? "<li>" str "</li>" : "")
+		# going down
 		else if (list_lvl[0] < list_lvl[1])
 			str = (list_type[1] == 1 ? "</ul>" : "</ol>") (str ? "<li>" str "</li>" : "")
+		# nested list
 		else if (list_type[0] != list_type[1])
 			str = (list_type[1] == 1 ? "</ul>" : "</ol>") (list_type[0] == 1 ? "<ul>" : "<ol>") (str ? "<li>" str "</li>" : "")
 		else
 			str = "<li>" str "</li>"
-	}
 
 	list_type[1] = list_type[0]
 	list_lvl[1] = list_lvl[0]
@@ -312,10 +337,13 @@ function md_fmt(str) {
 
 	#
 	# add br if there's two consecutive \n
+	# (with soooome exclusions)
 	#
-	if (str ~ /^$/ && prev_str !~ /<\/?(h|ul|ol|pre|br|p)/ && !c_vars["nobr"] && !c_vars["nobr_once"])
+	if (is_null(str) && c_vars["prev_line"] !~ /<\/?(h|ul|ol|pre|p)/ && !c_vars["no_br"]) {
 		str = "<br class=\"nl\">"
-	c_vars["nobr_once"] = 0
+	}
+	if (c_vars["no_br"] > 0)
+		c_vars["no_br"] --
 
 	#
 	# links and images
@@ -336,7 +364,7 @@ function md_fmt(str) {
 		end = substr(str, ix + rl)
 
 		if (is_image)
-			str = substr(start, 1, length(start) - 1) "<img alt=\""text"\" src=\""link"\">" end
+			str = substr(start, 1, length(start) - 1) "<img" (text ? " alt=\""text"\"" : "") " src=\""link"\">" end
 		else
 			str = start "<a href=\""link"\">"text"</a>" end
 	}
@@ -358,7 +386,7 @@ function md_fmt(str) {
 		str = start "<details><summary>" preview "</summary>" text "</details>" end
 	}
 
-	prev_str = str
+	c_vars["prev_line"] = str
 	return str
 }
 
@@ -389,7 +417,7 @@ function calls_e(call,   elem_name,elem_class,elem_props,arg_count) {
 	if (!elems[elem_name "_" elem_class]) {
 		logt("new element: '" elem_name "'")
 		elems[elem_name "_" elem_class] = 1
-		elem_nest_lvl ++
+		c_vars["e_nest_lvl"] ++
 		return sprintf("<%s%s%s>\n",
 			elem_name,
 			(elem_class == "_" ? "" : " class=\"" elem_class "\""),
@@ -397,7 +425,7 @@ function calls_e(call,   elem_name,elem_class,elem_props,arg_count) {
 	} else {
 		logt("closing element: '" elem_name "'")
 		elems[elem_name "_" elem_class] = 0
-		elem_nest_lvl --
+		c_vars["e_nest_lvl"] --
 		return "</" elem_name ">"
 	}
 }
@@ -482,7 +510,7 @@ function calls_start(call,   str,line) {
 	}
 
 	if (c_vars["script"])
-		str = str"\n" "\t<script src=\"" c_vars["script"] "\">"
+		str = str"\n" "\t<script src=\"" c_vars["script"] "\"></script>"
 
 	if (c_vars["script_inline"]) {
 		logt("starting inline script")
@@ -500,6 +528,7 @@ function calls_start(call,   str,line) {
 	}
 
 	reached_start = 1
+	c_vars["no_proc"] ++
 	str = str"\n" "</head>"
 	str = str"\n" "<body>"
 	return str
@@ -530,27 +559,17 @@ function calls_exec_raw(call,   str,line) {
 # same as before, just place the output in a codeblock
 #
 function calls_exec_fmt(call,   str,line) {
+	str
 	str = ""
 	if (is_null(call[0])) {
 		logt("empty !exec_fmt command", 3)
 		return
 	}
 
-	inside_codeblock = 3
-	while((call[0] | getline line) > 0) {
+	while((call[0] | getline line) > 0)
 		str = (str ? str "\n" : "") escape_html(line)
-		if (inside_codeblock == 2) {
-			inside_codeblock = 1
-			return "<pre class=\"cb\"><code class=\"cb\">" str
-		} else if (str == "```") {
-			inside_codeblock = 0
-			return "</code></pre>"
-		}
-	}
 	close(call[0])
-	# make the markdown formatter not add a break after code
-	prev_str = "<h"
-	inside_codeblock = 0
+	c_vars["no_proc"] ++
 
 	return "<pre class=\"cb\"><code class=\"cb\">" str "</code></pre>"
 }
@@ -575,7 +594,7 @@ function calls_var(call,   eqpos,key,value) {
 		c_vars[key] = value
 
 	logt("'"key"' = ""'"value"'")
-	c_vars["nobr_once"] = 1
+	c_vars["no_br"] ++
 	return
 }
 
@@ -595,7 +614,7 @@ function calls_inc(call,   inc_file,line,prev_file,str) {
 	}
 
 	str = ""
-	prev_str = "<h"
+	c_vars["no_br"] ++
 	prev_file = c_vars["file"]
 	c_vars["file"] = inc_file
 
@@ -605,6 +624,7 @@ function calls_inc(call,   inc_file,line,prev_file,str) {
 	close(inc_file)
 
 	c_vars["file"] = prev_file
+	c_vars["no_proc"] ++
 	return str
 }
 
@@ -629,6 +649,7 @@ function callproc(str, explicit,   len) {
 		call[i - 1] = call[i]
 		call[0] = call[0] (i > 2 ? " " : "") call[i]
 	}
+	call[len] = ""
 
 	if (!reached_start && !explicit && call["name"] !~ /(inc|var|start)/) {
 		logt("skipping data before start call", 2)
@@ -637,18 +658,20 @@ function callproc(str, explicit,   len) {
 
 	if (call["name"] == "start")
 		str = calls_start(call)
-	if (call["name"] == "e")
+	else if (call["name"] == "e")
 		str = calls_e(call)
-	if (call["name"] == "eo")
+	else if (call["name"] == "eo")
 		str = calls_eo(call)
-	if (call["name"] == "exec_raw")
+	else if (call["name"] == "exec_raw")
 		str = calls_exec_raw(call)
-	if (call["name"] == "exec_fmt")
+	else if (call["name"] == "exec_fmt")
 		str = calls_exec_fmt(call)
-	if (call["name"] == "var")
+	else if (call["name"] == "var")
 		str = calls_var(call)
-	if (call["name"] == "inc")
+	else if (call["name"] == "inc")
 		str = calls_inc(call)
+	else
+		logt("unknown call: '" call["name"] "'", 2)
 
 	return str
 }
@@ -663,18 +686,14 @@ function expand_inline(str,   start,mid,end) {
 	# first expand all the variables
 	#
 	while (match(str, /\{\$[^{$]+\$\}/)) {
-		logt("--------------------------")
-		logt("what\t\"" str "\"")
-
 		start = substr(str, 1, RSTART - 1)
-		mid = c_vars[substr(str, RSTART + 2, RLENGTH - 4)]
+		mid = substr(str, RSTART + 2, RLENGTH - 4)
 		end = substr(str, RSTART + RLENGTH)
-		str = start mid end
-
-		logt("start\t\"" start "\"")
-		logt("mid\t\"" mid "\"")
-		logt("end\t\"" end "\"")
-		logt("str\t\"" str "\"")
+		if (substr(str, RSTART - 1, 1) == "\\") {
+			start = substr(start, 1, length(start) - 1)
+			str = start "&#123;&#36;" mid "&#36;&#125;" end
+		} else
+			str = start c_vars[mid] end
 	}
 
 	#
@@ -682,54 +701,67 @@ function expand_inline(str,   start,mid,end) {
 	#
 	while (match(str, /\{![^{!]+!\}/)) {
 		start = substr(str, 1, RSTART - 1)
-		mid = callproc(substr(str, RSTART + 2, RLENGTH - 4), 1)
+		mid = substr(str, RSTART + 2, RLENGTH - 4)
 		end = substr(str, RSTART + RLENGTH)
-		str = start mid end
+		if (substr(str, RSTART - 1, 1) == "\\") {
+			start = substr(start, 1, length(start) - 1)
+			str = start "&#123;&#33;" mid "&#33;&#125;" end
+		} else
+			str = start callproc(mid, 1) end
 	}
 
 	return str
 }
 
 #
-# everything
+# combining the logic together
 #
 function tegproc(str) {
-	c_vars["prev_line"] = str
-
-	if (str ~ /^==/)
+	c_vars["current_line"] = str
+	if (str ~ /^==/ && !c_vars["inside_codeblock"])
 		return
 
-	if (str !~ /^([ \t]*|![^\[])$/)
-		reached_data = 1
+	if (str !~ /^!.+$/ && !reached_start)
+		return
 
-	if (c_vars["escape"] && str !~ /\{\$.+\$\}/)
+	if (c_vars["escape"] && str !~ /\{[$!].+[$!]\}/ && !c_vars["no_proc"])
 		str = escape_html(str)
 
-	if (!inside_codeblock) {
+	if (!c_vars["inside_codeblock"] && !c_vars["no_proc"]) {
 		str = expand_inline(str)
 		str = callproc(str)
 	}
 
-	if (!reached_data)
-		return
-	else if (!reached_start) {
+	if (!reached_start && !c_vars["no_proc"] && str) {
 		logt("skipping data before start call", 2)
 		return
 	}
 
-	str = md_fmt(str) (c_vars["prev_line"] ~ /^[^!]/ ? "\n" : "")
+	if (!c_vars["no_proc"])
+		str = md_fmt(str) (c_vars["current_line"] ~ /^[^!]/ || c_vars["inside_pre"] ? "\n" : "")
+
+	if (c_vars["no_proc"] > 0)
+		c_vars["no_proc"] --
+	c_vars["prev_line"] = str
+
+	gsub(/\\\\/, "\\", str)
+
 	return str
 }
 
-{
-	printf("%s", tegproc($0))
-}
-
-
 END {
-	md_fmt("")
 	if (reached_start) {
+		# cleanly finish all pending markdown work
+		c_vars["no_br"] ++
+		md_fmt("")
 		print "</body>"
 		print "</html>"
 	}
+}
+
+#
+# the awk's "main" function
+#
+{
+	printf("%s", tegproc($0))
 }

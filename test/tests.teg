@@ -1,0 +1,130 @@
+!var style_inline=style.css
+!start
+
+# headings
+text after heading
+
+## heading2
+
+text after heading2
+
+### heading3
+
+
+text with newline
+
+###### heading 6
+
+# simple markdown
+
+------------
+> horizontal rule
+-------------
+text after horizontal rule
+------------
+> blockquotes
+
+> a
+>
+> b
+>> cde
+> f
+------------
+> lists
+
+- 1
+- 2
+- 3
+
+1. one
+1. two
+1. three
+
+- list
+  1. mixed
+	2. with a tab
+  - yeah
+- back to normal
+----------
+> codeblocks
+
+```
+text
+line2
+```
+
+empty codeblock
+```
+```
+----------
+> formatted text
+
+*italic*
+ *italic2* hello
+
+**bold**
+ **bold2** hello
+
+***bold italic***
+ ***bold italic2*** hello
+
+~~strikethrough~~
+~~strikethrough2~~ hello
+
+__underline__
+__underline2__
+
+[link](https://example.com)
+ [link2](https://example.com) hello
+
+![image](https://picsum.photos/128/128)
+ ![image2](https://picsum.photos/128/128) hello
+
+`code`
+ `code2` hello
+
+> nested markdown inside blockquotes
+> *italic*
+> [link](https://example.com)
+------------
+
+# teg things
+
+-------
+> variables
+
+!var test=hello
+{$test$}
+ {$test$}
+!var test
+-------
+> spoilers
+
+||[Click me]Boo!||
+-------
+> empty markdown elements
+
+[empty link1]()
+[](empty link2)
+![empty image1]()
+![](empty image2)
+
+||[empty spoiler1]||
+
+||[]empty spoiler2||
+
+||[ ]empty spoiler3||
+
+-------
+
+```
+Hello, World!
+```
+
+> escaped
+
+\{!exec_raw!}
+\{$hello$}
+
+\*hello*
+\**hello**

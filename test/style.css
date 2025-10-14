@@ -1,0 +1,20 @@
+body {
+	font-family: ui-monospace, monospace, system-ui, helvetica, serif;
+	font-size: 14px;
+}
+
+code { background: #eee; font-family: inherit; }
+pre {
+  font-family: inherit;
+  background: #eee;
+  padding: 10px;
+  overflow-x: auto;
+}
+
+blockquote p { display: inline; }
+blockquote {
+	border-left: 5px solid #ccc;
+	margin: 0em;
+	padding: 0 5px;
+	color: #555;
+}
