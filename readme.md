@@ -38,30 +38,36 @@ Calls are defined with an exclamation mark at the start of a line:
 If the call exists, it will be executed, and the line replaced with the call's return.
 
 The current implemented calls are:
+
 ---
 > !**var** *variable*=*value*
 
 Set *variable* to *value*
 
 If *value* is not set but an equals sign exists, clear *variable*
+
 ---
 > !**start**
 
 Declare the start of the webpage.
 
 You can only use !**inc** and !**var** before !**start**.
+
 ---
 > !**exec_raw** *command*
 
 Run a *command* in your system's command interpreter and give its output to the Markdown processor.
+
 ---
 > !**exec_fmt** *command*
 
 Run a *command* and paste its output as a code block. Disables the Markdown processor for the contents of the code block.
+
 ---
 > !**inc** *file*
 
 Include a file.
+
 ---
 > !**e** *element* *class* *options*
 
@@ -70,10 +76,12 @@ Open an HTML tag on first call, remember the class, and close the tag on the sec
 If *class* is "_", the HTML tag does not receive a class.
 
 The *options* get passed to the HTML tag like so: `!e div _ style="font-size: 90%;"` -> `<div style="font-size: 90%;">`
+
 ---
 > !**eo** *element* *class* *options*
 
 Same as !**e**; just don't remember the class and don't close the element. Only use on self-closing tags.
+
 ---
 
 ### Inline calls
@@ -97,82 +105,102 @@ ls output: {!exec_fmt ls {$ls_args$}!}
 
 ## Variables
 teg has some built-in variables that you can read for information or set to change behavior:
+
 ---
 > **file**
 
 File that is currently being processed.
+
 ---
 > **title**=**file**
 
 Page title.
+
 ---
 > **description**
 
 Page description (appears in search engines).
+
 ---
 > **lang**=*en-US*
 
 Page locale.
+
 ---
 > **color_chrome**
 
 Browser style color (only for mobile).
+
 ---
 > **icon**
 
 Favicon.
+
 ---
 > **style**
 
 External CSS stylesheet to reference.
+
 ---
 > **style_inline**
 
 CSS stylesheet to include in HTML.
+
 ---
 > **script**
 
 External JS to reference.
+
 ---
 > **script_inline**
 
 Inline JS to include in HTML.
+
 ---
 > **debug**=*1*
 
 Enable / disable debug logging.
+
 ---
 > **exit_on_error**=*1*
 
 Abort processing and exit on error.
+
 ---
 > **no_br**=*0*
 
 Ignore line breaks for the next N lines.
+
 ---
 > **no_proc**=*0*
 
 Halt processing for the next N lines.
+
 ---
 > **current_line**
 
 Current line, unprocessed.
+
 ---
 > **prev_line**
 
 Previous processed line.
+
 ---
 > **e_nest_lvl**=*0*
 
 Current element nesting level.
+
 ---
 > **inside_pre**=*0*
 
 Are we inside preformatted text?
+
 ---
 > **inside_codeblock**=*0*
 
 Are we inside a codeblock?
+
 ---
 ### Markdown
 teg's markdown is relatively close to the one you are familiar with, except for some missing features and convenience changes, notably:
@@ -185,6 +213,7 @@ teg's markdown is relatively close to the one you are familiar with, except for 
 ```
 
 ||[Click me]Boo!||
+
 ---
 > **Modified newline behavior**
 
@@ -212,6 +241,7 @@ Line 4
 ~~strikethrough!~~
 ```
 ~~strikethrough!~~
+
 ---
 
 Escaping with \\ is implemented manually for each element because of some limitations,
