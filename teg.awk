@@ -207,7 +207,7 @@ function md_fmt(str) {
 		if (c_vars["inside_codeblock"] == 2) {
 			c_vars["inside_codeblock"] = 1
 			c_vars["inside_pre"] = 1
-			return "<pre class=\"cb\"><code class=\"cb\">" str
+			return "<pre class=\"cb-pre\"><code class=\"cb-code\">" str
 		} else if (str == "```") {
 			c_vars["inside_codeblock"] = 0
 			c_vars["inside_pre"] = 0
@@ -581,7 +581,7 @@ function calls_exec_fmt(call,   str,line,tmp,i,c) {
 		str = str escape_html(tmp[i]) "\n"
 
 	c_vars["no_proc"] ++
-	return "<pre class=\"cb\"><code class=\"cb\">" str "</code></pre>"
+	return "<pre class=\"cb-pre\"><code class=\"cb-code\">" str "</code></pre>"
 }
 
 #
