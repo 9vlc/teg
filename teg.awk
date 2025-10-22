@@ -508,10 +508,17 @@ function calls_start(call,   str,line) {
 		} else
 			logt("style file '" style_file "' does not exist", 2)
 	}
-
 	if (c_vars["script"])
 		str = str"\n" "\t<script src=\"" c_vars["script"] "\"></script>"
 
+	reached_start = 1
+	c_vars["no_proc"] ++
+	str = str"\n" "</head>"
+	str = str"\n" "<body>"
+
+	#
+	# inline scripts must be in body
+	#
 	if (c_vars["script_inline"]) {
 		logt("starting inline script")
 		script_file = relpath(c_vars["script_inline"])
@@ -526,11 +533,6 @@ function calls_start(call,   str,line) {
 		} else
 			logt("script file '" relpath(c_vars["script_inline"]) "' does not exist", 3)
 	}
-
-	reached_start = 1
-	c_vars["no_proc"] ++
-	str = str"\n" "</head>"
-	str = str"\n" "<body>"
 	return str
 }
 
@@ -558,20 +560,59 @@ function calls_exec_raw(call,   str,line) {
 #
 # same as before, just place the output in a codeblock
 #
-function calls_exec_fmt(call,   str,line) {
-	str
+function calls_exec_fmt(call,   str,line,tmp,i,c) {
+	c = 0
 	str = ""
 	if (is_null(call[0])) {
 		logt("empty !exec_fmt command", 3)
 		return
 	}
 
-	while((call[0] | getline line) > 0)
-		str = (str ? str "\n" : "") escape_html(line)
+	#
+	# copying the exec_inc approach here "just in case"
+	#
+	while((call[0] | getline line) > 0) {
+		tmp[c] = line
+		c ++
+	}
 	close(call[0])
-	c_vars["no_proc"] ++
 
+	for (i = 0; i < c; i++)
+		str = str escape_html(tmp[i]) "\n"
+
+	c_vars["no_proc"] ++
 	return "<pre class=\"cb\"><code class=\"cb\">" str "</code></pre>"
+}
+
+#
+# !exec_inc command ...
+#
+# execute a command and include (tegproc) its output
+#
+function calls_exec_inc(call,   str,line,tmp,i,c) {
+	c = 0
+	str = ""
+	if (is_null(call[0])) {
+		logt("empty !exec_raw command", 3)
+		return
+	}
+
+	#
+	# must separate getline and tegproc else we get a nasty
+	# vulnerability on gawk because of pipe propagation
+	# (i should probably report this someday???)
+	#
+	while((call[0] | getline line) > 0) {
+		tmp[c] = line
+		c ++
+	}
+	close(call[0])
+
+	for (i = 0; i < c; i++)
+		str = str tegproc(tmp[i])
+
+	c_vars["no_br"] ++
+	return str
 }
 
 #
@@ -666,6 +707,8 @@ function callproc(str, explicit,   len) {
 		str = calls_exec_raw(call)
 	else if (call["name"] == "exec_fmt")
 		str = calls_exec_fmt(call)
+	else if (call["name"] == "exec_inc")
+		str = calls_exec_inc(call)
 	else if (call["name"] == "var")
 		str = calls_var(call)
 	else if (call["name"] == "inc")
@@ -679,13 +722,13 @@ function callproc(str, explicit,   len) {
 #
 # expand inline variables and calls
 # inline variable: {$var_name$}
-# inline call: {!call_name!}
+# inline call: {!call_name args ...!}
 #
 function expand_inline(str,   start,mid,end) {
 	#
 	# first expand all the variables
 	#
-	while (match(str, /\{\$[^{$]+\$\}/)) {
+	while (match(str, /\{\$[^{][^$]*\$\}/)) {
 		start = substr(str, 1, RSTART - 1)
 		mid = substr(str, RSTART + 2, RLENGTH - 4)
 		end = substr(str, RSTART + RLENGTH)
@@ -699,7 +742,7 @@ function expand_inline(str,   start,mid,end) {
 	#
 	# then run all inline calls
 	#
-	while (match(str, /\{![^{!]+!\}/)) {
+	while (match(str, /\{![^{][^!]*!\}/)) {
 		start = substr(str, 1, RSTART - 1)
 		mid = substr(str, RSTART + 2, RLENGTH - 4)
 		end = substr(str, RSTART + RLENGTH)
@@ -724,7 +767,8 @@ function tegproc(str) {
 	if (str !~ /^!.+$/ && !reached_start)
 		return
 
-	if (c_vars["escape"] && str !~ /\{[$!].+[$!]\}/ && !c_vars["no_proc"])
+	# pretty bad solution for skipping escapes for calls, need to fix this someday
+	if (c_vars["escape"] && str !~ /(\{!exec.*!}|^!exec)/ && !c_vars["no_proc"])
 		str = escape_html(str)
 
 	if (!c_vars["inside_codeblock"] && !c_vars["no_proc"]) {
