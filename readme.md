@@ -6,7 +6,7 @@ compatible with pretty much all AWKs out there, so you can even use teg on [Plan
 
 teg is meant to be a minimal building block for your full website; it only acts as a page generator.
 You can piece together teg with your own scripts and programs to, for example, make a full-on [CGI](https://en.wikipedia.org/wiki/Common_Gateway_Interface) system.
-teg can be used with a [Makefile](https://en.wikipedia.org/wiki/Make_(software\)) to generate a static site from a list of `.teg` files.
+teg can be used with a [Makefile](https://en.wikipedia.org/wiki/Make_(software)) to generate a static site from a list of `.teg` files.
 
 
 The current implementation of teg consists of several discrete parts:
@@ -212,28 +212,30 @@ teg's markdown is relatively close to the one you are familiar with, except for 
 ||[Click me]Boo!||
 ```
 
-||[Click me]Boo!||
+<details>
+   <summary>Click me</summary>
+   Boo!
+</details>
 
 ---
 > **Modified newline behavior**
 
 ```
 Line 1
+Same line
+
 Line 2
 
-Line 3
 
-
-Line 4
+Line 4?
 ```
-
-Line 1
+formats as
+```
+Line 1 Same line
 Line 2
 
-Line 3
-
-
-Line 4
+Line 4?
+```
 ---
 > **Strikethrough text**
 
