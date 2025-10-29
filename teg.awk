@@ -54,7 +54,7 @@ BEGIN {
 	c_vars["script"] = 0
 	c_vars["script_inline"] = 0
 	c_vars["color_chrome"] = 0
-	c_vars["debug"] = 1
+	c_vars["debug"] = 0
 	c_vars["exit_on_error"] = 1
 	c_vars["no_br"] = 0
 	c_vars["no_proc"] = 0
