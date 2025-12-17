@@ -177,14 +177,14 @@ Ignore line breaks for the next N lines.
 Halt processing for the next N lines.
 
 ---
-> **current_line**
+> **curr_line**
 
 Current line, unprocessed.
 
 ---
 > **prev_line**
 
-Previous processed line.
+Previous line, processed.
 
 ---
 > **e_nest_lvl**=*0*
