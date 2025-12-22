@@ -66,7 +66,7 @@ BEGIN {
 	c_vars["script"] = 0
 	c_vars["script_inline"] = 0
 	c_vars["color_chrome"] = 0
-	c_vars["debug"] = 1
+	c_vars["debug"] = 0
 	c_vars["exit_on_error"] = 1
 	c_vars["no_br"] = 0
 	c_vars["no_proc"] = 0
@@ -786,7 +786,9 @@ function calls_inc(call,   inc_file,line,prev_file,str) {
 # call[1+]     - args
 #
 function callproc(str, explicit,   len,call) {
+	# I forgot what does this variable do and I don't want to figure it out.
 	explicit = (explicit ? 1 : 0)
+
 	if (str ~ /^![^\[]/)
 		len = split(substr(str, 2), call, " ")
 	else if (explicit)
@@ -843,7 +845,7 @@ function expand_inline(str,   ret,parts,i) {
 		for (i = 1; i <= ret*2+1; i++)
 			if (i % 2)
 				str = str parts[i]
-			else if (substr(parts[i-1], length(parts[i-1], 1) == "\\"))
+			else if (substr(parts[i-1], length(parts[i-1]), 1) == "\\")
 				str = substr(str, 1, length(str) - 1) "&#123;&#36;" parts[i] "&#36;&#125;"
 			else
 				str = str c_vars[parts[i]]
@@ -858,7 +860,7 @@ function expand_inline(str,   ret,parts,i) {
 		for (i = 1; i <= ret*2+1; i++)
 			if (i % 2)
 				str = str parts[i]
-			else if (substr(parts[i-1], length(parts[i-1], 1) == "\\"))
+			else if (substr(parts[i-1], length(parts[i-1]), 1) == "\\")
 				str = substr(str, 1, length(str) - 1) "&#123;&#33;" parts[i] "&#33;&#125;"
 			else
 				str = str callproc(parts[i], 1)
@@ -879,7 +881,7 @@ function tegproc(str) {
 		return
 	
 	if (!reached_start)
-		if (str ~ /^!(start|var)/)
+		if (str ~ /^!(start|var|inc)/)
 			str = callproc(str)
 		else {
 			logt("skipping data before start call", 2)
