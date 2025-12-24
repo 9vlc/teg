@@ -883,6 +883,8 @@ function tegproc(str) {
 	if (!reached_start)
 		if (str ~ /^!(start|var|inc)/)
 			str = callproc(str)
+		else if (str ~ /^[ \t]*$/)
+			return
 		else {
 			logt("skipping data before start call", 2)
 			return
