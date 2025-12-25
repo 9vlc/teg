@@ -224,6 +224,8 @@ function escape_html(str) {
 # some other things that tend to break
 #
 function escape_html_wrap(str,   parts,ret,i) {
+	if (c_vars["no_proc"])
+		return str
 	if (str ~ reglist["call_inline"]) {
 		ret = split_surround(parts, str, reglist["call_inline"], 2)
 		str = ""
@@ -273,6 +275,10 @@ function md_resurround(str, elem, regexp, flen, alt,   parts,ralt,ret,i,k) {
 # call for each line and finish execution with one empty string and c_vars["no_br"] = 1
 #
 function md_fmt(str) {
+	if (c_vars["no_proc"]) {
+		return str
+	}
+
 	match(str, /^[ \t]*/)
 	indent_len = RLENGTH
 
@@ -722,7 +728,7 @@ function calls_exec_inc(call,   str,line,tmp,i,c) {
 	for (i = 0; i < c; i++)
 		str = str tegproc(tmp[i])
 
-	c_vars["no_br"] ++
+	c_vars["no_proc"] ++
 	return str
 }
 
@@ -789,9 +795,9 @@ function calls_inc(call,   inc_file,line,prev_file,str) {
 #
 function callproc(str, explicit,   len,call) {
 	if (c_vars["no_proc"])
-		return
-
-	# I forgot what does this variable do and I don't want to figure it out.
+		return str
+	
+	# still process even if no_proc or inside_codeblock are set
 	explicit = (explicit ? 1 : 0)
 
 	if (str ~ /^![^\[]/)
@@ -808,7 +814,10 @@ function callproc(str, explicit,   len,call) {
 	}
 	call[len] = ""
 
-	if (!reached_start && !explicit && call["name"] !~ /(inc|var|start)/) {
+	# do not run if...
+	if (!explicit && (c_vars["no_proc"] || c_vars["inside_codeblock"]))
+		return str
+	else if (!explicit && !reached_start && call["name"] !~ /(inc|var|start)/) {
 		logt("skipping data before start call", 2)
 		return
 	}
@@ -896,13 +905,12 @@ function tegproc(str) {
 			logt("skipping data before start call", 2)
 			return
 		}
-	else if (!c_vars["no_proc"]) {
-		if (c_vars["escape"])
-			str = escape_html_wrap(str)
-		str = expand_inline(str)
-		str = callproc(str)
-		str = md_fmt(str) (c_vars["curr_line"] !~ /^![^ \t].+/ || c_vars["inside_pre"] ? "\n" : "")
-	}
+
+	if (c_vars["escape"])
+		str = escape_html_wrap(str)
+	str = expand_inline(str)
+	str = callproc(str)
+	str = md_fmt(str) (c_vars["curr_line"] !~ /^![^ \t].+/ || c_vars["inside_pre"] ? "\n" : "")
 
 	if (c_vars["no_proc"] && c_vars["no_proc"] ~ /^[0-9]+$/)
 		c_vars["no_proc"] --
