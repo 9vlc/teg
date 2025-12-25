@@ -209,13 +209,14 @@ function MARK(opt_txt) {
 # escape & < > " ' in text
 #
 function escape_html(str) {
-	gsub(/&/, "\\&amp;", str);
-	gsub(/"/, "\\&quot;", str);
-	gsub(/'/, "\\&apos;", str);
-	gsub(/</, "\\&lt;", str);
+	gsub(/&/, "\\&amp;", str)
+	gsub(/"/, "\\&quot;", str)
+	gsub(/'/, "\\&apos;", str)
+	gsub(/</, "\\&lt;", str)
+	gsub(/\\\\/, "\\&#92;", str)
 	if (str !~ /^>+( |$)/)
-		gsub(/>/, "\\&gt;", str);
-	return str;
+		gsub(/>/, "\\&gt;", str)
+	return str
 }
 
 #
@@ -230,9 +231,9 @@ function escape_html_wrap(str,   parts,ret,i) {
 			if (i % 2)
 				str = str escape_html(parts[i])
 			else
-				str = str parts[i]
+				str = str "{!" parts[i] "!}"
 		}
-	} else if (str !~ /^!(e|eo|var|exec_raw|exec_fmt)[ \t]/)
+	} else if (str !~ /^![A-Za-z0-9_]+[ \t]/)
 		return escape_html(str)
 	return str
 }
@@ -290,6 +291,7 @@ function md_fmt(str) {
 		}
 		return str
 	} else if (str == "```") {
+		# initialize the codeblock on the next line
 		c_vars["inside_codeblock"] = 2
 		return
 	}
@@ -786,6 +788,9 @@ function calls_inc(call,   inc_file,line,prev_file,str) {
 # call[1+]     - args
 #
 function callproc(str, explicit,   len,call) {
+	if (c_vars["no_proc"])
+		return
+
 	# I forgot what does this variable do and I don't want to figure it out.
 	explicit = (explicit ? 1 : 0)
 
@@ -836,6 +841,8 @@ function callproc(str, explicit,   len,call) {
 # inline call: {!call_name args ...!}
 #
 function expand_inline(str,   ret,parts,i) {
+	if (c_vars["no_proc"])
+		return str
 	#
 	# first expand all variables
 	#
@@ -869,44 +876,42 @@ function expand_inline(str,   ret,parts,i) {
 	return str
 }
 
-
-
 #
 # the main teg processor function
 #
 function tegproc(str) {
 	c_vars["curr_line"] = str
 	
-	if (str ~ /^==/ && !c_vars["inside_codeblock"])
+	if (str ~ /^==/ && !c_vars["inside_codeblock"] && !c_vars["no_proc"])
 		return
 	
 	if (!reached_start)
-		if (str ~ /^!(start|var|inc)/)
+		if (str ~ /^!(start|var|inc|exec_inc|exec_raw)/) {
+			str = expand_inline(str)
 			str = callproc(str)
+		}
 		else if (str ~ /^[ \t]*$/)
 			return
 		else {
 			logt("skipping data before start call", 2)
 			return
 		}
-
-	if (!c_vars["no_proc"]) {
+	else if (!c_vars["no_proc"]) {
 		if (c_vars["escape"])
 			str = escape_html_wrap(str)
-		if (!c_vars["inside_codeblock"]) {
-			str = expand_inline(str)
-			str = callproc(str)
-		}
+		str = expand_inline(str)
+		str = callproc(str)
 		str = md_fmt(str) (c_vars["curr_line"] !~ /^![^ \t].+/ || c_vars["inside_pre"] ? "\n" : "")
 	}
-	
+
 	if (c_vars["no_proc"] && c_vars["no_proc"] ~ /^[0-9]+$/)
 		c_vars["no_proc"] --
-	else if (c_vars["curr_line"] ~ c_vars["no_proc"])
+	else if (c_vars["curr_line"] == c_vars["no_proc"]) {
 		c_vars["no_proc"] = 0
+		return
+	}
 
 	c_vars["prev_line"] = str
-	gsub(/\\\\/, "\\", str)
 	return str
 }
 
