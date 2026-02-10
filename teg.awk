@@ -4,7 +4,7 @@
 # https://github.com/9vlc/teg
 #
 # SPDX-License-Identifier: BSD-3-Clause
-# Copyright (c) 2025 Alexey Laurentsyeu
+# Copyright (c) 2025-2026 Alexey Laurentsyeu
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -595,12 +595,25 @@ function calls_start(call,   str,line) {
 	str = str"\n" "<head>"
 	str = str"\n" "\t<meta charset=\"UTF-8\">"
 	str = str"\n" "\t<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
+	str = str"\n" "\t<meta property=\"og:type\" content=\"website\">"
 
-	if (c_vars["title"])
+	if (c_vars["title"]) {
 		str = str"\n" "\t<title>" c_vars["title"] "</title>"
+		str = str"\n" "\t<meta property=\"og:title\" content=\"" c_vars["title"] "\">"
+		str = str"\n" "\t<meta name=\"twitter:title\" content=\"" c_vars["title"] "\">"
+	}
 
-	if (c_vars["description"])
+	if (c_vars["description"]) {
 		str = str"\n" "\t<meta name=\"description\" content=\"" c_vars["description"] "\">"
+		str = str"\n" "\t<meta property=\"og:description\" content=\"" c_vars["description"] "\">"
+		str = str"\n" "\t<meta name=\"twitter:description\" content=\"" c_vars["description"] "\">"
+	}
+
+	if (c_vars["embed_img"]) {
+		str = str"\n" "\t<meta property=\"og:image\" content=\"" c_vars["embed_img"] "\">"
+		str = str"\n" "\t<meta name=\"twitter:card\" content=\"summary_large_image\">"
+		str = str"\n" "\t<meta name=\"twitter:image\" content=\"" c_vars["embed_img"] "\">"
+	}
 
 	if (c_vars["color_chrome"])
 		str = str"\n" "\t<meta name=\"theme-color\" content=\"" c_vars["color_chrome"] "\">"
