@@ -75,6 +75,7 @@ BEGIN {
 	c_vars["e_nest_lvl"] = 0
 	c_vars["inside_pre"] = 0
 	c_vars["inside_codeblock"] = 0
+	c_vars["status"] = 0
 }
 
 #
@@ -588,6 +589,12 @@ function calls_start(call,   str,line) {
 
 	if (reached_start)
 		return
+
+	if (c_vars["status"]) {
+		str = str     "Status: " c_vars["status"]
+		str = str"\n" "Content-type: text/plain"
+		str = str"\n" "\n"
+	}
 
 	str = str     "<!DOCTYPE html>"
 	str = str"\n" "<!-- Generated with teg: https://github.com/9vlc/teg -->"
