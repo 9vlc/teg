@@ -63,36 +63,41 @@ If *value* is not set but an equals sign exists, clear *variable*
 
 Declare the start of the webpage.
 
-You can only use !**inc** and !**var** before !**start**.
+You can only use !**inc** and !**var** before !**start**
 
 
 > !**exec_raw** *command*
 
-Run a *command* in your system's command interpreter and give its output to the Markdown processor.
+Run a *command* in your system's command interpreter and give its output to the Markdown processor
 
 
 > !**exec_fmt** *command*
 
-Run a *command* and paste its output as a code block. Disables the Markdown processor for the contents of the code block.
+Run a *command* and paste its output as a code block. Disables the Markdown processor for the contents of the code block
+
+
+> !**exec_inc** *command*
+
+Execute a command and include its output as teg
 
 
 > !**inc** *file*
 
-Include a file.
+Include a file
 
 
 > !**e** *element* *class* *options*
 
-Open an HTML tag on first call, remember the class, and close the tag on the second call for the same class.
+Open an HTML tag on first call, remember the class, and close the tag on the second call for the same class
 
-If *class* is "_", the HTML tag does not receive a class.
+If *class* is "_", the HTML tag does not receive a class
 
 The *options* get passed to the HTML tag like so: `!e div _ style="font-size: 90%;"` -> `<div style="font-size: 90%;">`
 
 
 > !**eo** *element* *class* *options*
 
-Same as !**e**; just don't remember the class and don't close the element. Only use on self-closing tags.
+Same as !**e**; just don't remember the class and don't close the element. Only use on self-closing tags!
 
 ## Inline calls
 The following syntax can be used to include a call or a variable without splitting a line:
@@ -146,6 +151,19 @@ Page description for OpenGraph embeds
 
 Page locale
 
+> **status**
+
+Return an HTTP status for use with CGI
+
+Must be set before !**start**
+
+
+> **ctype**=*text/html*
+
+Content type for use with CGI
+
+Only works together with **status**
+
 
 > **color_chrome**
 
@@ -156,6 +174,8 @@ Browser style color (only for mobile)
 
 Add an OpenGraph image embed
 
+Must be a link to a website
+
 
 > **icon**
 
@@ -165,11 +185,6 @@ Favicon
 > **style**
 
 External CSS stylesheet to reference
-
-
-> **status**
-
-Return an HTTP status for use with CGI
 
 
 > **style_inline**

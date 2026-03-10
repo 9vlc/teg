@@ -26,4 +26,4 @@ static-file.exclude-extensions = ( ".teg" )
 (as long as you have teg in /opt/teg/teg.awk)
 
 # Pull requests
-Don't.
+I'm worried for your sanity.
