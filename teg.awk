@@ -76,8 +76,8 @@ BEGIN {
 	c_vars["inside_pre"] = 0
 	c_vars["inside_codeblock"] = 0
 	c_vars["status"] = 0
+	c_vars["ctype"] = "text/html"
 }
-
 #
 # check if the string is empty / whitespace
 # return 1 if it is
@@ -592,7 +592,10 @@ function calls_start(call,   str,line) {
 
 	if (c_vars["status"]) {
 		str = str     "Status: " c_vars["status"]
-		str = str"\n" "Content-type: text/plain"
+		if (!is_null(c_vars["ctype"]))
+			str = str"\n" "Content-type: " c_vars["ctype"]
+		else
+			str = str"\n" "Content-type: text/html"
 		str = str"\n" "\n"
 	}
 
