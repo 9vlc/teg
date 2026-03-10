@@ -24,6 +24,3 @@ static-file.exclude-extensions = ( ".teg" )
 ```
 ... and now .teg files will be automatically formatted 
 (as long as you have teg in /opt/teg/teg.awk)
-
-# Pull requests
-Don't.
