@@ -178,9 +178,24 @@ Browser style color (only for mobile)
 
 > **embed_img**
 
-Add an OpenGraph image embed
+Add an image embed
 
 Must be a link to a website
+
+
+> **embed_og**=*1*
+
+Enable OpenGraph embeds (`<meta property="og:.." ...>`)
+
+
+> **embed_twt**=*1*
+
+Enable Twitter embeds (`<meta name="twitter:.." ...>`)
+
+Setting this to 0 doesn't disable embeds on Twitter (i think)
+as it also uses OpenGraph
+
+This is used by Discord for large image embeds
 
 
 > **icon**

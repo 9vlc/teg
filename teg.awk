@@ -75,6 +75,9 @@ BEGIN {
 	c_vars["e_nest_lvl"] = 0
 	c_vars["inside_pre"] = 0
 	c_vars["inside_codeblock"] = 0
+	c_vars["embed_img"] = 0
+	c_vars["embed_og"] = 1
+	c_vars["embed_twt"] = 1
 	c_vars["status"] = 0
 	c_vars["ctype"] = "text/html"
 }
@@ -605,24 +608,32 @@ function calls_start(call,   str,line) {
 	str = str"\n" "<head>"
 	str = str"\n" "\t<meta charset=\"UTF-8\">"
 	str = str"\n" "\t<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
-	str = str"\n" "\t<meta property=\"og:type\" content=\"website\">"
+	if (c_vars["embed_og"])
+		str = str"\n" "\t<meta property=\"og:type\" content=\"website\">"
 
 	if (c_vars["title"]) {
 		str = str"\n" "\t<title>" c_vars["title"] "</title>"
-		str = str"\n" "\t<meta property=\"og:title\" content=\"" c_vars["title"] "\">"
-		str = str"\n" "\t<meta name=\"twitter:title\" content=\"" c_vars["title"] "\">"
+		if (c_vars["embed_og"])
+			str = str"\n" "\t<meta property=\"og:title\" content=\"" c_vars["title"] "\">"
+		if (c_vars["embed_twt"])
+			str = str"\n" "\t<meta name=\"twitter:title\" content=\"" c_vars["title"] "\">"
 	}
 
 	if (c_vars["description"]) {
 		str = str"\n" "\t<meta name=\"description\" content=\"" c_vars["description"] "\">"
-		str = str"\n" "\t<meta property=\"og:description\" content=\"" c_vars["description"] "\">"
-		str = str"\n" "\t<meta name=\"twitter:description\" content=\"" c_vars["description"] "\">"
+		if (c_vars["embed_og"])
+			str = str"\n" "\t<meta property=\"og:description\" content=\"" c_vars["description"] "\">"
+		if (c_vars["embed_twt"])
+			str = str"\n" "\t<meta name=\"twitter:description\" content=\"" c_vars["description"] "\">"
 	}
 
 	if (c_vars["embed_img"]) {
-		str = str"\n" "\t<meta property=\"og:image\" content=\"" c_vars["embed_img"] "\">"
-		str = str"\n" "\t<meta name=\"twitter:card\" content=\"summary_large_image\">"
-		str = str"\n" "\t<meta name=\"twitter:image\" content=\"" c_vars["embed_img"] "\">"
+		if (c_vars["embed_og"])
+			str = str"\n" "\t<meta property=\"og:image\" content=\"" c_vars["embed_img"] "\">"
+		if (c_vars["embed_twt"]) {
+			str = str"\n" "\t<meta name=\"twitter:card\" content=\"summary_large_image\">"
+			str = str"\n" "\t<meta name=\"twitter:image\" content=\"" c_vars["embed_img"] "\">"
+		}
 	}
 
 	if (c_vars["color_chrome"])
