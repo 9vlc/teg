@@ -66,6 +66,11 @@ Declare the start of the webpage.
 You can only use !**inc** and !**var** before !**start**
 
 
+> !**abort** *exit code*
+
+Cleanly abort execution
+
+
 > !**exec_raw** *command*
 
 Run a *command* in your system's command interpreter and give its output to the Markdown processor

@@ -677,6 +677,29 @@ function calls_start(call,   str,line) {
 }
 
 #
+# !abort exitcode
+#
+# abort execution of a teg script
+#
+function calls_abort(call) {
+	if (!reached_start) {
+		if (c_vars["status"]) {
+			str = str     "Status: " c_vars["status"]
+			if (!is_null(c_vars["ctype"]))
+				str = str"\n" "Content-type: " c_vars["ctype"]
+			else
+				str = str"\n" "Content-type: text/html"
+			str = str"\n" "\n"
+		}
+	} else {
+		# awk's END runs on exit, so don't know what to put here for now
+	}
+
+	printf("%s", str)
+	exit((call[0] ? call[0] : 1))
+}
+
+#
 # !exec_raw command ...
 #
 # execute a command and return its output
@@ -840,13 +863,16 @@ function callproc(str, explicit,   len,call) {
 	# do not run if...
 	if (!explicit && (c_vars["no_proc"] || c_vars["inside_codeblock"]))
 		return str
-	else if (!explicit && !reached_start && call["name"] !~ /(inc|var|start)/) {
+	# another pre-start call whitelist here
+	else if (!explicit && !reached_start && call["name"] !~ /(inc|exec_inc|var|start|abort)/) {
 		logt("skipping data before start call", 2)
 		return
 	}
 
 	if (call["name"] == "start")
 		str = calls_start(call)
+	else if (call["name"] == "abort")
+		str = calls_abort(call)
 	else if (call["name"] == "e")
 		str = calls_e(call)
 	else if (call["name"] == "eo")
@@ -918,7 +944,8 @@ function tegproc(str) {
 		return
 	
 	if (!reached_start)
-		if (str ~ /^!(start|var|inc|exec_inc|exec_raw)/) {
+		# pre-start call whitelist
+		if (str ~ /^!(start|abort|var|inc|exec_inc)/) {
 			str = expand_inline(str)
 			str = callproc(str)
 		}
