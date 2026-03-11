@@ -600,7 +600,7 @@ function calls_start(call,   str,line) {
 	}
 
 	str = str     "<!DOCTYPE html>"
-	str = str"\n" "<!-- Generated with teg: https://github.com/9vlc/teg -->"
+	str = str"\n" "<!-- https://codeberg.org/9vlc/teg -->"
 	str = str"\n" "<html lang=\"" c_vars["lang"] "\">"
 	str = str"\n" "<head>"
 	str = str"\n" "\t<meta charset=\"UTF-8\">"
