@@ -1,10 +1,10 @@
 #!/usr/bin/awk -f
 #
 # processor for teg files in awk
-# https://github.com/9vlc/teg
+# https://codeberg.org/9vlc/teg
 #
 # SPDX-License-Identifier: BSD-3-Clause
-# Copyright (c) 2025-2026 Alexey Laurentsyeu
+# Copyright (c) 2025 2026 Alexey Laurentsyeu
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
