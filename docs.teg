@@ -53,10 +53,15 @@ The current implemented calls are:
 
 
 > !**var** *variable*=*value*
+>
+> !**var** *variable*=*delim*
 
 Set *variable* to *value*
 
 If *value* is not set but an equals sign exists, clear *variable*
+
+
+Or in example 2, start collecting lines into variable until the encounter of *delim*, similar to shell heredocs.
 
 
 > !**start**

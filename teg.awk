@@ -45,6 +45,7 @@ BEGIN {
 	list_lvl[1] = 0
 	list_type[0] = 0
 	list_stack[0] = 0
+	var_long = ""
 
 	reglist["call_inline"] = "\\{![^{][^!]*!\\}"
 	reglist["var_inline"] = "\\{\\$[^{][^$]*\\$\\}"	
@@ -795,11 +796,30 @@ function calls_exec_inc(call,   str,line,tmp,i,c) {
 # set variable to value.
 # if value is not provided
 #
-function calls_var(call,   eqpos,key,value) {
+function calls_var(call,   eqpos,key,value,marker) {
 	eqpos = index(call[0], "=")
-	if (!eqpos)
-		return c_vars[key]
 
+	if (!eqpos) {
+		eqpos = index(call[0], "<")
+		if (!eqpos)
+			return c_vars[key]
+
+		# < logic
+		key = substr(call[0], 1, eqpos - 1)
+		marker = substr(call[0], eqpos + 1)
+
+		# can only have up to one at the same time, sorry
+		if (var_long)
+			logt("can't do two long variables", 3)
+		else {
+			var_long = key"<"marker
+			logt("long var: '"var_long"'")
+		}
+		c_vars["no_br"] ++
+		return
+	}
+
+	# = logic
 	key = substr(call[0], 1, eqpos - 1)
 	value = substr(call[0], eqpos + 1)
 
@@ -850,56 +870,82 @@ function calls_inc(call,   inc_file,line,prev_file,str) {
 # call[0]      - concat args
 # call[1+]     - args
 #
-function callproc(str, explicit,   len,call) {
+function callproc(str, explicit,   len,call,long_key,long_marker,delim,nope) {
 	if (c_vars["no_proc"])
 		return str
 	
 	# still process even if no_proc or inside_codeblock are set
 	explicit = (explicit ? 1 : 0)
 
+	if (var_long) {
+		delim = index(var_long, "<")
+		long_key = substr(var_long, 1, delim - 1)
+		long_marker = substr(var_long, delim + 1)
+	}
+
+	nope = 0
 	if (str ~ /^![^\[]/)
 		len = split(substr(str, 2), call, " ")
 	else if (explicit)
 		len = split(str, call, " ")
+	else if (var_long)
+		nope = 1
 	else
 		return str
 
-	call["name"] = call[1]
-	for (i = 2; i <= len; i++) {
-		call[i - 1] = call[i]
-		call[0] = call[0] (i > 2 ? " " : "") call[i]
-	}
-	call[len] = ""
+	if (!nope) {
+		call["name"] = call[1]
+		for (i = 2; i <= len; i++) {
+			call[i - 1] = call[i]
+			call[0] = call[0] (i > 2 ? " " : "") call[i]
+		}
+		call[len] = ""
 
-	# do not run if...
-	if (!explicit && (c_vars["no_proc"] || c_vars["inside_codeblock"]))
-		return str
-	# another pre-start call whitelist here
-	else if (!explicit && !reached_start && call["name"] !~ /(inc|exec_inc|var|start|abort)/) {
-		logt("skipping data before start call", 2)
+		# do not run if...
+		if (!explicit && (c_vars["no_proc"] || c_vars["inside_codeblock"]))
+			return str
+		# another pre-start call whitelist here
+		else if (!explicit && !reached_start && !var_long && call["name"] !~ /(inc|exec_inc|var|start|abort)/) {
+			logt("skipping data before start call", 2)
+			return
+		}
+
+		if (call["name"] == "start")
+			str = calls_start(call)
+		else if (call["name"] == "abort")
+			str = calls_abort(call)
+		else if (call["name"] == "e")
+			str = calls_e(call)
+		else if (call["name"] == "eo")
+			str = calls_eo(call)
+		else if (call["name"] == "exec_raw")
+			str = calls_exec_raw(call)
+		else if (call["name"] == "exec_fmt")
+			str = calls_exec_fmt(call)
+		else if (call["name"] == "exec_inc")
+			str = calls_exec_inc(call)
+		else if (call["name"] == "var")
+			str = calls_var(call)
+		else if (call["name"] == "inc")
+			str = calls_inc(call)
+		else
+			logt("unknown call: '" call["name"] "'", 2)
+	}
+
+	# if we're doing a !var name<EOL
+	if (var_long && long_marker) {
+		if (str == long_marker) {
+			var_long = ""
+			logt("str: "str" marker: "long_marker)
+			c_vars["no_br"] ++ # +2
+			c_vars[long_key] = c_vars[long_key] md_fmt("")
+		}
+		else
+			c_vars[long_key] = c_vars[long_key] md_fmt(str) "\n"
+
+		c_vars["no_br"] ++
 		return
 	}
-
-	if (call["name"] == "start")
-		str = calls_start(call)
-	else if (call["name"] == "abort")
-		str = calls_abort(call)
-	else if (call["name"] == "e")
-		str = calls_e(call)
-	else if (call["name"] == "eo")
-		str = calls_eo(call)
-	else if (call["name"] == "exec_raw")
-		str = calls_exec_raw(call)
-	else if (call["name"] == "exec_fmt")
-		str = calls_exec_fmt(call)
-	else if (call["name"] == "exec_inc")
-		str = calls_exec_inc(call)
-	else if (call["name"] == "var")
-		str = calls_var(call)
-	else if (call["name"] == "inc")
-		str = calls_inc(call)
-	else
-		logt("unknown call: '" call["name"] "'", 2)
 
 	return str
 }
@@ -953,13 +999,15 @@ function tegproc(str) {
 	
 	if (str ~ /^==/ && !c_vars["inside_codeblock"] && !c_vars["no_proc"])
 		return
-	
-	if (!reached_start)
+
+	if (!reached_start && !var_long)
 		# pre-start call whitelist
 		if (str ~ /^!(start|abort|var|inc|exec_inc)/) {
 			str = expand_inline(str)
 			str = callproc(str)
 		}
+		else if (var_long)
+			str = callproc(str)
 		else if (str ~ /^[ \t]*$/)
 			return
 		else {
@@ -971,7 +1019,11 @@ function tegproc(str) {
 		str = escape_html_wrap(str)
 	str = expand_inline(str)
 	str = callproc(str)
-	str = md_fmt(str) (c_vars["curr_line"] !~ /^![^ \t].+/ || c_vars["inside_pre"] ? "\n" : "")
+	if (!var_long)
+		str = md_fmt(str)
+
+	if ((c_vars["curr_line"] !~ /^![^ \t].+/) && !var_long)
+		str = str "\n"
 
 	if (c_vars["no_proc"] && c_vars["no_proc"] ~ /^[0-9]+$/)
 		c_vars["no_proc"] --
