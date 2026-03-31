@@ -1,4 +1,5 @@
-# teg
+![teg!](extra/teg.png)
+----
 teg is a something I made more of as a joke that has grown into a
 completely usable web templating language made entirely in AWK.
 
