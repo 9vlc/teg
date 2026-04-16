@@ -516,10 +516,12 @@ function md_fmt(str) {
 # !e element class options
 #
 # place an element (html tag)
-# stores a list of elements in a global variable and
-# closes them when user calls the same element again
+# stores a list of elements in a global variable and closes them after calling
+# for the same element type w/ no props.
+# 
+# the shot argument determines whether to act as !e, !eo or !eoc
 #
-function calls_e(call,   elem_name,elem_class,elem_props,arg_count) {
+function calls_e(call, shot,   elem_name,elem_class,elem_props,arg_count) {
 	elem_name = call[1]
 	elem_class = (call[2] ? call[2] : "_")
 	arg_count = 0
@@ -536,50 +538,34 @@ function calls_e(call,   elem_name,elem_class,elem_props,arg_count) {
 	elem_class = strip_sp(elem_class)
 	elem_props = strip_sp(elem_props)
 
-	if (!elems[elem_name "_" elem_class]) {
-		logt("new element: '" elem_name "'")
-		elems[elem_name "_" elem_class] = 1
-		c_vars["e_nest_lvl"] ++
-		return sprintf("<%s%s%s>\n",
+	if (shot == 0) {
+		if (!elems[elem_name "_" elem_class]) {
+			logt("new element: '" elem_name "'")
+			elems[elem_name "_" elem_class] = 1
+			c_vars["e_nest_lvl"] ++
+			return sprintf("<%s%s%s>\n",
+				elem_name,
+				(elem_class == "_" ? "" : " class=\"" elem_class "\""),
+				(elem_props  ? " " elem_props : ""))
+		} else {
+			logt("closing element: '" elem_name "'")
+			elems[elem_name "_" elem_class] = 0
+			c_vars["e_nest_lvl"] --
+			return "</" elem_name ">"
+		}
+	} else if (shot == 1) {
+		logt("new oneshot (open) element: '" elem_name "'")
+		return sprintf("<%s%s%s>",
 			elem_name,
 			(elem_class == "_" ? "" : " class=\"" elem_class "\""),
 			(elem_props  ? " " elem_props : ""))
-	} else {
-		logt("closing element: '" elem_name "'")
-		elems[elem_name "_" elem_class] = 0
-		c_vars["e_nest_lvl"] --
-		return "</" elem_name ">"
+	} else if (shot == 2) {
+		logt("new oneshot (closed) element: '" elem_name "'")
+		return sprintf("<%s%s%s/>",
+			elem_name,
+			(elem_class == "_" ? "" : " class=\"" elem_class "\""),
+			(elem_props  ? " " elem_props : ""))
 	}
-}
-
-#
-# !eo element class options
-#
-# same as before, just don't remember the state
-# meant for self-closing tags
-#
-function calls_eo(call,   elem_name,elem_class,elem_props,arg_count) {
-	elem_name = call[1]
-	elem_class = (call[2] ? call[2] : "_")
-	arg_count = 0
-	for (elem_props in call)
-		arg_count ++
-
-	elem_props = ""
-	for (i = 3; i <= arg_count; i++) {
-		elem_props = elem_props (i > 3 ? " " : "") call[i]
-	}
-	sub(/^[ \t]+/, "", elem_props)
-
-	elem_name = strip_sp(elem_name)
-	elem_class = strip_sp(elem_class)
-	elem_props = strip_sp(elem_props)
-
-	logt("new oneshot element: '" elem_name "'")
-	return sprintf("<%s%s%s>",
-		elem_name,
-		(elem_class == "_" ? "" : " class=\"" elem_class "\""),
-		(elem_props  ? " " elem_props : ""))
 }
 
 #
@@ -915,9 +901,11 @@ function callproc(str, explicit,   len,call,long_key,long_marker,delim,nope) {
 		else if (call["name"] == "abort")
 			str = calls_abort(call)
 		else if (call["name"] == "e")
-			str = calls_e(call)
+			str = calls_e(call, 0)
 		else if (call["name"] == "eo")
-			str = calls_eo(call)
+			str = calls_e(call, 1)
+		else if (call["name"] == "eoc")
+			str = calls_e(call, 2)
 		else if (call["name"] == "exec_raw")
 			str = calls_exec_raw(call)
 		else if (call["name"] == "exec_fmt")

@@ -54,14 +54,14 @@ The current implemented calls are:
 
 > !**var** *variable*=*value*
 >
-> !**var** *variable*=*delim*
+> !**var** *variable*<*delim*
 
 Set *variable* to *value*
 
 If *value* is not set but an equals sign exists, clear *variable*
 
 
-Or in example 2, start collecting lines into variable until the encounter of *delim*, similar to shell heredocs.
+The **var** call also supports using a heredoc-like syntax to input long multiline variables.
 
 
 > !**start**
@@ -107,7 +107,12 @@ The *options* get passed to the HTML tag like so: `!e div _ style="font-size: 90
 
 > !**eo** *element* *class* *options*
 
-Same as !**e**; just don't remember the class and don't close the element. Only use on self-closing tags!
+Same as !**e**, just don't remember the class and don't close the element. Only use on self-closing tags!
+
+
+> !**eoc** *element* *class* *options*
+
+Same as !**eo**, just immideately close the tag.
 
 ## Inline calls
 The following syntax can be used to include a call or a variable without splitting a line:
@@ -138,7 +143,7 @@ hello  \{$who$} <- NO!
 hello \\\{$who$} <- Yes!
 ```
 
-# Variables
+# Builtin variables
 teg has some built-in variables that you can read for information or set to change behavior:
 
 
