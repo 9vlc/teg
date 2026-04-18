@@ -215,22 +215,30 @@ Favicon
 
 > **style**
 
-External CSS stylesheet to reference
+External CSS stylesheet to reference, specified as a list of files separated by a semicolon
+
+Example: `!var style=data/main.css;mine.css`
 
 
 > **style_inline**
 
 CSS stylesheet to include in HTML
 
+Supports the same semicolon separated syntax
+
 
 > **script**
 
 External JS to reference
 
+Supports the same semicolon separated syntax
+
 
 > **script_inline**
 
-Inline JS to include in HTML
+Inline JS to include in <body>
+
+Supports the same semicolon separated syntax
 
 
 > **debug**=*0*

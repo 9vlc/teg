@@ -276,6 +276,26 @@ function md_resurround(str, elem, regexp, flen, alt,   parts,ralt,ret,i,k) {
 }
 
 #
+# read and concatenate a delimiter-separated list of files into a single variable
+#
+function read_list(list, delim,   file,files,cnt,line,r) {
+	r = ""
+	cnt = split(list, files, delim)
+	for (i = 1; i <= cnt; i++) {
+		file = relpath(strip_sp(files[i]))
+		if (!exists(file)) {
+			logt("file '"file"' does not exist", 2)
+			continue
+		}
+
+		while ((getline line < file))
+			r = r(r == "" ? "" : "\n") line
+		close(file)
+	}
+	return r
+}
+
+#
 # markdown processor
 # call for each line and finish execution with one empty string and c_vars["no_br"] = 1
 #
@@ -575,7 +595,7 @@ function calls_e(call, shot,   elem_name,elem_class,elem_props,arg_count) {
 # start the page
 # creates doctype, head, opens body.
 #
-function calls_start(call,   str,line) {
+function calls_start(call,   str,line,cnt,a) {
 	str = ""
 
 	if (reached_start)
@@ -630,25 +650,23 @@ function calls_start(call,   str,line) {
 	if (c_vars["icon"])
 		str = str"\n" "\t<link rel=\"icon\" href=\"" c_vars["icon"] "\">"
 
-	if (c_vars["style"])
-		str = str"\n" "\t<link rel=\"stylesheet\" type=\"text/css\" href=\"" c_vars["style"] "\">"
+	if (c_vars["style"]) {
+		cnt = split(c_vars["style"], a, ";")
+		for (i = 1; i <= cnt; i++)
+			str = str"\n" "\t<link rel=\"stylesheet\" type=\"text/css\" href=\"" strip_sp(a[i]) "\">"
+	}
 
 	if (c_vars["style_inline"]) {
 		logt("starting inline style")
-		style_file = relpath(c_vars["style_inline"])
-		logt("style file: '" style_file "'")
-
-		if (exists(style_file)) {
-			str = str"\n" "\t<style>"
-			while ((getline line < style_file) > 0)
-				str = str"\n" line
-			str = str"\n" "\t</style>"
-			close(style_file)
-		} else
-			logt("style file '" style_file "' does not exist", 2)
+		str = str"\n" "\t<style>" read_list(c_vars["style_inline"], ";")
+		str = str"\n" "\t</style>"
 	}
-	if (c_vars["script"])
-		str = str"\n" "\t<script src=\"" c_vars["script"] "\"></script>"
+
+	if (c_vars["script"]) {
+		cnt = split(c_vars["script"], a, ";")
+		for (i = 1; i <= cnt; i++)
+			str = str"\n" "\t<script src=\"" strip_sp(a[i]) "\"></script>"
+	}
 
 	reached_start = 1
 	c_vars["no_proc"] ++
@@ -656,21 +674,12 @@ function calls_start(call,   str,line) {
 	str = str"\n" "<body>"
 
 	#
-	# inline scripts must be in body
+	# inline scripts must be in body (i believe so)
 	#
 	if (c_vars["script_inline"]) {
 		logt("starting inline script")
-		script_file = relpath(c_vars["script_inline"])
-		logt("script script_file: '" script_file "'")
-
-		if (exists(script_file)) {
-			str = str"\n" "\t<script>"
-			while ((getline line < script_file) > 0)
-				str = str"\n" line
-			str = str"\n" "\t</script>"
-			close(script_file)
-		} else
-			logt("script file '" relpath(c_vars["script_inline"]) "' does not exist", 3)
+		str = str"\n" "\t<script>" read_list(c_vars["script_inline"], ";")
+		str = str"\n" "\t</script>"
 	}
 	return str
 }
