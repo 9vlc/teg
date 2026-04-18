@@ -1,5 +1,5 @@
 # What's teg?
-teg is a small (~600 LOC) portable web "[anti-framework](https://werc.cat-v.org)" foundation made in AWK,
+teg is a small *(~700 LOC by `cloc`, ~1000 lines total)* portable web "[anti-framework](https://werc.cat-v.org)" foundation made in AWK,
 compatible with pretty much all AWKs out there, so you can even use teg on [Plan 9](https://en.wikipedia.org/wiki/Plan_9_from_Bell_Labs).
 
 
