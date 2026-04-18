@@ -561,10 +561,11 @@ function calls_e(call, shot,   elem_name,elem_class,elem_props,arg_count) {
 			(elem_props  ? " " elem_props : ""))
 	} else if (shot == 2) {
 		logt("new oneshot (closed) element: '" elem_name "'")
-		return sprintf("<%s%s%s/>",
+		return sprintf("<%s%s%s></%s>",
 			elem_name,
 			(elem_class == "_" ? "" : " class=\"" elem_class "\""),
-			(elem_props  ? " " elem_props : ""))
+			(elem_props  ? " " elem_props : ""),
+			elem_name)
 	}
 }
 
