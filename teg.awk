@@ -215,8 +215,9 @@ function MARK(opt_txt) {
 #
 function escape_html(str) {
 	gsub(/&/, "\\&amp;", str)
-	gsub(/"/, "\\&quot;", str)
-	gsub(/'/, "\\&apos;", str)
+	# addition: let's not escape ' and " for now
+	# gsub(/"/, "\\&quot;", str)
+	# gsub(/'/, "\\&apos;", str)
 	gsub(/</, "\\&lt;", str)
 	gsub(/\\\\/, "\\&#92;", str)
 	if (str !~ /^>+( |$)/)
