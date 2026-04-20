@@ -112,7 +112,7 @@ Same as !**e**, just don't remember the class and don't close the element. Only 
 
 > !**eoc** *element* *class* *options*
 
-Same as !**eo**, just immideately close the tag.
+Same as !**eo**, just immediately close the tag.
 
 ## Inline calls
 The following syntax can be used to include a call or a variable without splitting a line:
