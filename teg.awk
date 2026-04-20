@@ -999,7 +999,7 @@ function tegproc(str) {
 	if (str ~ /^==/ && !c_vars["inside_codeblock"] && !c_vars["no_proc"])
 		return
 
-	if (!reached_start && !var_long)
+	if (!reached_start && !var_long) {
 		# pre-start call whitelist
 		if (str ~ /^!(start|abort|var|inc|exec_inc)/) {
 			str = expand_inline(str)
@@ -1013,6 +1013,7 @@ function tegproc(str) {
 			logt("skipping data before start call", 2)
 			return
 		}
+	}
 
 	if (c_vars["escape"])
 		str = escape_html_wrap(str)
@@ -1021,7 +1022,10 @@ function tegproc(str) {
 	if (!var_long)
 		str = md_fmt(str)
 
-	if ((c_vars["curr_line"] !~ /^![^ \t].+/) && !var_long)
+	# New special case for codeblocks (makes html less prettier but idc)
+	if (c_vars["inside_codeblock"])
+		str = "\n" str
+	else if ((c_vars["curr_line"] !~ /^![^ \t].+/) && !var_long)
 		str = str "\n"
 
 	if (c_vars["no_proc"] && c_vars["no_proc"] ~ /^[0-9]+$/)
