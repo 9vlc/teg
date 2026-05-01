@@ -1,6 +1,6 @@
 #!/usr/bin/awk -f
 #
-# processor for teg files in awk
+# Processor for teg files in awk
 # https://codeberg.org/9vlc/teg
 #
 # SPDX-License-Identifier: BSD-3-Clause
@@ -31,62 +31,119 @@
 # NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-BEGIN {
-	if (ARGC <= 1)
-		c_vars["file"] = "stdin"
-	else
-		c_vars["file"] = ARGV[1]
-
-	reached_data = 0
-	reached_start = 0
-	blockquote_lvl[0] = 0
-	blockquote_lvl[1] = 0
-	list_lvl[0] = 0
-	list_lvl[1] = 0
-	list_type[0] = 0
-	list_stack[0] = 0
-	var_long = ""
-
-	reglist["call_inline"] = "\\{![^{][^!]*!\\}"
-	reglist["var_inline"] = "\\{\\$[^{][^$]*\\$\\}"	
-	reglist["md_bold"] = "\\*\\*[^*]+\\*\\*"
-	reglist["md_italic"] = "\\*[^*]+\\*"
-	reglist["md_underscore"] = "__[^_]+__"
-	reglist["md_strikethrough"] = "~~[^~]+~~"
-	reglist["md_code"] = "`[^`]+`"
-	reglist["md_link"] = "\\[[^\\]]*\\]\\([^)]*[^\\\\]\\)"
-	reglist["md_spoiler"] = "\\|\\|\\[[^\\]]*\\][^\\|]*\\|\\|"
+#
+# Initialize all global variables
+#
+function TEG_init() {
+	#
+	# Internal variables
+	#
 	
-	c_vars["escape"] = 1
-	c_vars["title"] = c_vars["file"]
-	c_vars["description"] = 0
-	c_vars["lang"] = "en-US"
-	c_vars["icon"] = 0
-	c_vars["style"] = 0
-	c_vars["style_inline"] = 0
-	c_vars["script"] = 0
-	c_vars["script_inline"] = 0
-	c_vars["color_chrome"] = 0
-	c_vars["debug"] = 0
-	c_vars["exit_on_error"] = 1
-	c_vars["no_br"] = 0
-	c_vars["no_proc"] = 0
-	c_vars["curr_line"] = ""
-	c_vars["prev_line"] = "<h"
-	c_vars["e_nest_lvl"] = 0
-	c_vars["inside_pre"] = 0
-	c_vars["inside_codeblock"] = 0
-	c_vars["embed_img"] = 0
-	c_vars["embed_og"] = 1
-	c_vars["embed_twt"] = 1
-	c_vars["status"] = 0
-	c_vars["ctype"] = "text/html"
+	# Check
+	TEG_init_done = 1
+	# Did we reach any data in the file
+	TEG_reached_data = 0
+	# Did we reach the !start call
+	TEG_reached_start = 0
+	# Blockquote nesting level
+	TEG_blockquote_lvl[0] = 0
+	# Previous blockquote nesting level
+	TEG_blockquote_lvl[1] = 0
+	# List nesting level
+	TEG_list_lvl[0] = 0
+	# Previous list nesting level
+	TEG_list_lvl[1] = 0
+	# List type
+	TEG_list_type[0] = 0
+	# List stack
+	TEG_list_stack[0] = 0
+	# Current heredoc variable delimiter
+	TEG_var_long = ""
+	# List of HTML element with assigned IDs
+	TEG_id_list[""] = 0
+
+
+	# REGEX for different things
+	TEG_reglist["call_inline"] = "\\{![^{][^!]*!\\}"
+	TEG_reglist["var_inline"] = "\\{\\$[^{][^$]*\\$\\}"
+	TEG_reglist["md_bold"] = "\\*\\*[^*]+\\*\\*"
+	TEG_reglist["md_italic"] = "\\*[^*]+\\*"
+	TEG_reglist["md_underscore"] = "__[^_]+__"
+	TEG_reglist["md_strikethrough"] = "~~[^~]+~~"
+	TEG_reglist["md_code"] = "`[^`]+`"
+	TEG_reglist["md_link"] = "\\[[^\\]]*\\]\\([^)]*[^\\\\]\\)"
+	TEG_reglist["md_spoiler"] = "\\|\\|\\[[^\\]]*\\][^\\|]*\\|\\|"
+
+	# Whitelist for variables that are allowed before !start
+	TEG_before_start_list = "(start|abort|var|inc|log|exec_inc)"
+
+	#
+	# User accessible vars
+	#
+
+	# If we're running teg standalone
+	if (!TEG_AS_LIBRARY)
+		if (ARGC <= 1)
+			TEG_c_vars["file"] = "stdin"
+		else
+			TEG_c_vars["file"] = ARGV[1]
+
+	# Print a bunch of debugging information
+	TEG_c_vars["debug"] = 0
+	# Exit on error!
+	TEG_c_vars["exit_on_error"] = 1
+
+	# HTML escapes
+	TEG_c_vars["escape"] = 1
+	# Stop putting <br> after two newlines, value decrements each line until 0
+	TEG_c_vars["no_br"] = 0
+	# Stop the teg processing for N lines, value decrements each line until 0
+	TEG_c_vars["no_proc"] = 0
+
+	TEG_c_vars["title"] = TEG_c_vars["file"]
+	TEG_c_vars["description"] = 0
+	TEG_c_vars["lang"] = "en-US"
+	TEG_c_vars["icon"] = 0
+	TEG_c_vars["style"] = 0
+	TEG_c_vars["style_inline"] = 0
+	TEG_c_vars["script"] = 0
+	TEG_c_vars["script_inline"] = 0
+
+	# Current unprocessed line
+	TEG_c_vars["curr_line"] = ""
+	# Previous processed line
+	TEG_c_vars["prev_line"] = "<h"
+
+	# Current element nesting level
+	TEG_c_vars["e_nest_lvl"] = 0
+	# Are we inside a <pre>?
+	TEG_c_vars["inside_pre"] = 0
+	# Are we inside a codeblock?
+	TEG_c_vars["inside_codeblock"] = 0
+
+	# Color accent (hex) for mobile chromium and some social media embeds
+	TEG_c_vars["color_chrome"] = 0
+	# URL of an image to embed for social media
+	TEG_c_vars["embed_img"] = 0
+	# Whether to use OpenGraph for embeds
+	TEG_c_vars["embed_og"] = 0
+	# Whether to use the twitter protocol for embeds
+	TEG_c_vars["embed_twt"] = 0
+
+	# HTTP status (required for cgi)
+	TEG_c_vars["status"] = 0
+	# HTTP content type (required for cgi)
+	TEG_c_vars["ctype"] = "text/html"
+	# Color accent for mobile chromium and some social media embeds
+	TEG_c_vars["color_chrome"] = 0
+
 }
+
 #
-# check if the string is empty / whitespace
-# return 1 if it is
+# Check if the string is empty / whitespace
+# Return 1 if it is
 #
-function is_null(str) {
+function TEG_is_null(str) {
 	gsub(/[ \n\t]/, "", str)
 	if (length(str))
 		return 0
@@ -95,18 +152,18 @@ function is_null(str) {
 }
 
 #
-# return a string with stripped leading and trailing whitespace
+# Return a string with stripped leading and trailing whitespace
 #
-function strip_sp(str) {
+function TEG_strip_sp(str) {
 	gsub(/^[ \t]+/, "", str)
 	gsub(/[ \t]+$/, "", str)
 	return str
 }
 
 #
-# return a formatted array for debugging
+# Return a formatted array for debugging
 #
-function explode_arr(arr,   str,elem) {
+function TEG_explode_arr(arr,   str,elem) {
 	str = "\t"
 	for (elem in arr) {
 		elem = elem " : \"" arr[elem] "\""
@@ -117,20 +174,21 @@ function explode_arr(arr,   str,elem) {
 }
 
 #
-# split a string containing surround separated substrings into a
-# 1-indexed array with odd entries being text outside of surround
-# separators and even entries inside of surround separators.
-# returns the count of entries in the resulting array
+# Split a string containing surround separated substrings into a 1-indexed
+#   array with odd entries being text outside of surround separators and
+#   even entries inside of surround separators.
 #
-# arguments are as follows:
-#   array to write data to
-#   input string
-#   regex matching a pair of text surrounds
-#   length of one side of a surround
+# Returns the count of entries in the resulting array
 #
-# example:
-#   split_surround(p, "hello %test% world! %aaa%", "%[^%]+%", 1)
-# will write the following to p[]:
+# Arguments are as follows:
+#   Array to write data to
+#   Input string
+#   REGEX matching a pair of text surrounds
+#   Length of one side of a surround
+#
+# Example:
+#   TEG_split_surround(p, "hello %test% world! %aaa%", "%[^%]+%", 1)
+# Will write the following to p[]:
 #   p[1] = "hello "
 #   p[2] = "test"
 #   p[3] = " world! "
@@ -138,14 +196,14 @@ function explode_arr(arr,   str,elem) {
 #   p[5] = ""
 # and return 2
 #
-function split_surround(p, str, sep, slen,   i) {
+function TEG_split_surround(p, str, sep, slen,   i) {
 	delete p
 	i = 1
 	while (match(str, sep)) {
 		p[i*2-1] = substr(str, 1, RSTART - 1)
 		p[i*2] = substr(str, RSTART + slen, RLENGTH - slen * 2)
 		p[i*2+1] = substr(str, RSTART + RLENGTH)
-		
+
 		str = p[i*2+1]
 		i ++
 	}
@@ -153,11 +211,11 @@ function split_surround(p, str, sep, slen,   i) {
 }
 
 #
-# does this file exist?
-# return 1 if so
+# Does this file exist?
+# Return 1 if so
 #
-function exists(file,   r) {
-	if (is_null(file))
+function TEG_exists(file,   r) {
+	if (TEG_is_null(file))
 		return 0
 	r = getline _ < file
 	close(file)
@@ -165,57 +223,57 @@ function exists(file,   r) {
 }
 
 #
-# complete input path with currently running teg script's path
-# and return a correct relative path to the file for later use.
-# if input is a full path, return it as it is,
+# Complete input path with currently running teg script's path and return a
+#   correct relative path to the file for later use.
+# If input is a full path, return it as it is,
 #
-function relpath(path,   dir) {
-	if (match(path, /^\//) || c_vars["file"] == "stdin")
+function TEG_relpath(path,   dir) {
+	if (match(path, /^\//) || TEG_c_vars["file"] == "stdin")
 		return path
-	dir = c_vars["file"]
+	dir = TEG_c_vars["file"]
     sub(/[^\/]*$/, "", dir)
 	return dir path
 }
 
 #
-# logs various messages to stderr
-# types:
+# Logs various messages to stderr
+# Types:
 # 1 - debug
 # 2 - warning
 # 3 - error
 #
-function logt(txt, type) {
+function TEG_logt(str, type) {
 	if (type == 1 || !type) {
-		if (c_vars["debug"])
-			print "debug: " txt > "/dev/stderr"
+		if (TEG_c_vars["debug"])
+			print "debug: " str > "/dev/stderr"
 		else
 			return 1
 	} else if (type == 2) {
-		print "warning: " txt > "/dev/stderr"
+		print "warning: " str > "/dev/stderr"
 	} else if (type == 3) {
-		print "error: " txt > "/dev/stderr"
-		if (c_vars["exit_on_error"])
-			exit c_vars["exit_on_error"]
+		print "error: " str > "/dev/stderr"
+		if (TEG_c_vars["exit_on_error"])
+			exit TEG_c_vars["exit_on_error"]
 	}
 	return 0
 }
 
 #
-# logt wrapper for debugging where did an error occur
+# TEG_logt wrapper for debugging where did an error occur
 #
-function MARK(opt_txt) {
-	c_vars["marker_num"] = (c_vars["marker_num"] ? c_vars["marker_num"] : 1)
-	logt("MARKER " c_vars["marker_num"] (opt_txt ? " / " opt_txt : ""))
-	c_vars["marker_num"] ++
+function TEG_MARK(optional_str) {
+	TEG_c_vars["marker_num"] = (TEG_c_vars["marker_num"] ? TEG_c_vars["marker_num"] : 1)
+	TEG_logt("MARKER " TEG_c_vars["marker_num"] (optional_str ? " / " optional_str : ""))
+	TEG_c_vars["marker_num"] ++
 	return
 }
 
 #
-# escape & < > " ' in text
+# Escape & < > " ' in text
 #
-function escape_html(str) {
+function TEG_escape_html(str) {
 	gsub(/&/, "\\&amp;", str)
-	# addition: let's not escape ' and " for now
+	# Addition: let's not escape ' and " for now
 	# gsub(/"/, "\\&quot;", str)
 	# gsub(/'/, "\\&apos;", str)
 	gsub(/</, "\\&lt;", str)
@@ -226,37 +284,36 @@ function escape_html(str) {
 }
 
 #
-# same as before but skip inline calls and
-# some other things that tend to break
+# Same as before but skip inline calls and some other things that tend to break
 #
-function escape_html_wrap(str,   parts,ret,i) {
-	if (c_vars["no_proc"])
+function TEG_escape_html_wrap(str,   parts,ret,i) {
+	if (TEG_c_vars["no_proc"])
 		return str
-	if (str ~ reglist["call_inline"]) {
-		ret = split_surround(parts, str, reglist["call_inline"], 2)
+	if (str ~ TEG_reglist["call_inline"]) {
+		ret = TEG_split_surround(parts, str, TEG_reglist["call_inline"], 2)
 		str = ""
 		for (i = 1; i <= ret*2+1; i++) {
 			if (i % 2)
-				str = str escape_html(parts[i])
+				str = str TEG_escape_html(parts[i])
 			else
 				str = str "{!" parts[i] "!}"
 		}
 	} else if (str !~ /^![A-Za-z0-9_]+[ \t]/)
-		return escape_html(str)
+		return TEG_escape_html(str)
 	return str
 }
 
 #
-# replace a surround with an html tag
+# Replace a surround with an HTML tag
 #
-# arguments are as follows:
-#   input string
-#   replacement html tag name
-#   length of one side of a surround
-#   html escape sequence replacing a surround symbol
+# Arguments are as follows:
+#   Input string
+#   Replacement html tag name
+#   Length of one side of a surround
+#   HTML escape sequence replacing a surround symbol
 #
-function md_resurround(str, elem, regexp, flen, alt,   parts,ralt,ret,i,k) {
-	ret = split_surround(parts, str, regexp, flen)
+function TEG_md_resurround(str, elem, regexp, flen, alt,   parts,ralt,ret,i,k) {
+	ret = TEG_split_surround(parts, str, regexp, flen)
 	if (ret) {
 		str = ""
 		for (i = 1; i <= ret*2+1; i++)
@@ -277,31 +334,31 @@ function md_resurround(str, elem, regexp, flen, alt,   parts,ralt,ret,i,k) {
 }
 
 #
-# read and concatenate a delimiter-separated list of files into a single variable
+# Read and concatenate a delimiter-separated list of files into a single variable
 #
-function read_list(list, delim,   file,files,cnt,line,r) {
+function TEG_read_list(list, delim,   file,files,cnt,line,r) {
 	r = ""
 	cnt = split(list, files, delim)
 	for (i = 1; i <= cnt; i++) {
-		file = relpath(strip_sp(files[i]))
-		if (!exists(file)) {
-			logt("file '"file"' does not exist", 2)
+		file = TEG_relpath(TEG_strip_sp(files[i]))
+		if (!TEG_exists(file)) {
+			TEG_logt("file '"file"' does not exist", 2)
 			continue
 		}
 
 		while ((getline line < file))
-			r = r(r == "" ? "" : "\n") line
+			r = r (r == "" ? "" : "\n") line
 		close(file)
 	}
 	return r
 }
 
 #
-# markdown processor
-# call for each line and finish execution with one empty string and c_vars["no_br"] = 1
+# Markdown processor
+# Call for each line and finish execution with one empty string and TEG_c_vars["no_br"] = 1
 #
-function md_fmt(str) {
-	if (c_vars["no_proc"]) {
+function TEG_md_fmt(str,   indent_len,blockstr,i,start,liststr,ix,rl,link_md,is_image,text,link,end,spoiler_md,preview) {
+	if (TEG_c_vars["no_proc"]) {
 		return str
 	}
 
@@ -309,36 +366,36 @@ function md_fmt(str) {
 	indent_len = RLENGTH
 
 	#
-	# codeblocks
+	# Codeblocks
 	#
-	if (c_vars["inside_codeblock"]) {
-		if (c_vars["inside_codeblock"] == 2) {
-			c_vars["inside_codeblock"] = 1
-			c_vars["inside_pre"] = 1
+	if (TEG_c_vars["inside_codeblock"]) {
+		if (TEG_c_vars["inside_codeblock"] == 2) {
+			TEG_c_vars["inside_codeblock"] = 1
+			TEG_c_vars["inside_pre"] = 1
 			return "<pre class=\"cb-pre\"><code class=\"cb-code\">" str
 		} else if (str == "```") {
-			c_vars["inside_codeblock"] = 0
-			c_vars["inside_pre"] = 0
+			TEG_c_vars["inside_codeblock"] = 0
+			TEG_c_vars["inside_pre"] = 0
 			return "</code></pre>"
 		}
 		return str
 	} else if (str == "```") {
-		# initialize the codeblock on the next line
-		c_vars["inside_codeblock"] = 2
+		# Initialize the codeblock on the next line
+		TEG_c_vars["inside_codeblock"] = 2
 		return
 	}
 
 	#
-	# bold, italic, underscode, strikethrough, code
+	# Bold, italic, underscode, strikethrough, code
 	#
-	str = md_resurround(str, "strong", reglist["md_bold"], 2, "&#42;")
-	str = md_resurround(str, "em", reglist["md_italic"], 1, "&#42;")
-	str = md_resurround(str, "u", reglist["md_underscore"], 2, "&#95;")
-	str = md_resurround(str, "s", reglist["md_strikethrough"], 2, "&#126;")
-	str = md_resurround(str, "code", reglist["md_code"], 1, "&#96;")
+	str = TEG_md_resurround(str, "strong", TEG_reglist["md_bold"], 2, "&#42;")
+	str = TEG_md_resurround(str, "em", TEG_reglist["md_italic"], 1, "&#42;")
+	str = TEG_md_resurround(str, "u", TEG_reglist["md_underscore"], 2, "&#95;")
+	str = TEG_md_resurround(str, "s", TEG_reglist["md_strikethrough"], 2, "&#126;")
+	str = TEG_md_resurround(str, "code", TEG_reglist["md_code"], 1, "&#96;")
 
 	#
-	# headings
+	# Headings
 	#
 	if (str ~ /^# /)
 		str = "<h1>" substr(str, 3) "</h1>"
@@ -354,116 +411,116 @@ function md_fmt(str) {
 		str = "<h6>" substr(str, 8) "</h6>"
 
 	#
-	# horizontal rule
+	# Horizontal rule
 	#
 	if (str ~ /^---+$/) {
 		str = "<hr>"
 	}
 
 	#
-	# blockquotes
+	# Blockquotes
 	#
-	# current depth
+	# Current depth
 	#
-	blockquote_lvl[0] = 0
+	TEG_blockquote_lvl[0] = 0
 	if (str ~ /^>+/) {
 		match(str, /^>+/)
-		blockquote_lvl[0] = RLENGTH
-		if (blockquote_lvl[0] > 0)
-			str = substr(str, blockquote_lvl[0] + 2)
+		TEG_blockquote_lvl[0] = RLENGTH
+		if (TEG_blockquote_lvl[0] > 0)
+			str = substr(str, TEG_blockquote_lvl[0] + 2)
 	}
 	#
-	# depth increases
+	# Depth increases
 	#
 	blockstr = ""
-	if (blockquote_lvl[0] > blockquote_lvl[1]) {
-		for (i = 0; i < blockquote_lvl[0] - blockquote_lvl[1]; i++)
+	if (TEG_blockquote_lvl[0] > TEG_blockquote_lvl[1]) {
+		for (i = 0; i < TEG_blockquote_lvl[0] - TEG_blockquote_lvl[1]; i++)
 			blockstr = blockstr "<blockquote>"
 		blockstr = blockstr "<p>"
 	}
 	#
-	# depth decreases
+	# Depth decreases
 	#
-	if (blockquote_lvl[0] < blockquote_lvl[1]) {
+	if (TEG_blockquote_lvl[0] < TEG_blockquote_lvl[1]) {
 		blockstr = "</p>"
-		for (i = 0; i < blockquote_lvl[1] - blockquote_lvl[0]; i++)
+		for (i = 0; i < TEG_blockquote_lvl[1] - TEG_blockquote_lvl[0]; i++)
 		blockstr = blockstr "</blockquote>"
 	}
 	#
-	# depth stays the same
+	# Depth stays the same
 	#
-	if (str ~ /^$/ && blockquote_lvl[0] > 0)
+	if (str ~ /^$/ && TEG_blockquote_lvl[0] > 0)
 		str = "<br class=\"nl-bq\">"
-	if (!is_null(blockstr))
+	if (!TEG_is_null(blockstr))
 		str = blockstr str
-		blockquote_lvl[1] = blockquote_lvl[0]
+		TEG_blockquote_lvl[1] = TEG_blockquote_lvl[0]
 	#
-	# blockquotes end
+	# Blockquotes end
 	#
 
 	#
-	# lists (help please this is awful)
+	# Lists (help please this is awful)
 	#
-	list_type[0] = 0
-	list_lvl[0] = 0
-	
+	TEG_list_type[0] = 0
+	TEG_list_lvl[0] = 0
+
 	if (match(str, /^[ \t]*- /))
-		list_type[0] = 1
+		TEG_list_type[0] = 1
 	else if (match(str, /^[ \t]*[0-9]+\. /))
-		list_type[0] = 2
+		TEG_list_type[0] = 2
 
 	if (str ~ /^[ \t]*(-|[0-9]+\.) /) {
 		start = substr(str, 1, indent_len)
 		gsub(/\t/, "  ", start)
-		list_lvl[0] = length(start) / 2 + 1
+		TEG_list_lvl[0] = length(start) / 2 + 1
 		str = substr(str, RLENGTH + 1)
 	}
 
 	liststr = ""
 
-	# list start
-	if (list_type[0] && !list_type[1]) {
-		list_stack[list_lvl[0]] = list_type[0]
-		liststr = (list_type[0] == 1 ? "<ul>" : "<ol>")
+	# List start
+	if (TEG_list_type[0] && !TEG_list_type[1]) {
+		TEG_list_stack[TEG_list_lvl[0]] = TEG_list_type[0]
+		liststr = (TEG_list_type[0] == 1 ? "<ul>" : "<ol>")
 		str = "<li>" str "</li>"
 	}
-	# list end
-	else if (!list_type[0] && list_type[1]) {
-		# close everything
-		for (i = list_lvl[1]; i >= 1; i--) {
-			liststr = liststr (list_stack[i] == 1 ? "</ul>" : "</ol>")
-			delete list_stack[i]
+	# List end
+	else if (!TEG_list_type[0] && TEG_list_type[1]) {
+		# Close everything
+		for (i = TEG_list_lvl[1]; i >= 1; i--) {
+			liststr = liststr (TEG_list_stack[i] == 1 ? "</ul>" : "</ol>")
+			delete TEG_list_stack[i]
 		}
 	}
-	# 
-	else if (list_type[0] && list_type[1]) {
+	#
+	else if (TEG_list_type[0] && TEG_list_type[1]) {
 		# nest++
-		if (list_lvl[0] > list_lvl[1]) {
-			list_stack[list_lvl[0]] = list_type[0]
-			liststr = (list_type[0] == 1 ? "<ul>" : "<ol>")
+		if (TEG_list_lvl[0] > TEG_list_lvl[1]) {
+			TEG_list_stack[TEG_list_lvl[0]] = TEG_list_type[0]
+			liststr = (TEG_list_type[0] == 1 ? "<ul>" : "<ol>")
 			str = "<li>" str "</li>"
 		}
 		# nest--
-		else if (list_lvl[0] < list_lvl[1]) {
-			# closing up old lists
-			for (i = list_lvl[1]; i > list_lvl[0]; i--) {
-				liststr = liststr (list_stack[i] == 1 ? "</ul>" : "</ol>")
-				delete list_stack[i]
+		else if (TEG_list_lvl[0] < TEG_list_lvl[1]) {
+			# Closing up old lists
+			for (i = TEG_list_lvl[1]; i > TEG_list_lvl[0]; i--) {
+				liststr = liststr (TEG_list_stack[i] == 1 ? "</ul>" : "</ol>")
+				delete TEG_list_stack[i]
 			}
 			# no
-			if (list_type[0] != list_stack[list_lvl[0]]) {
-				liststr = liststr (list_stack[list_lvl[0]] == 1 ? "</ul>" : "</ol>")
-				liststr = liststr (list_type[0] == 1 ? "<ul>" : "<ol>")
-				list_stack[list_lvl[0]] = list_type[0]
+			if (TEG_list_type[0] != TEG_list_stack[TEG_list_lvl[0]]) {
+				liststr = liststr (TEG_list_stack[TEG_list_lvl[0]] == 1 ? "</ul>" : "</ol>")
+				liststr = liststr (TEG_list_type[0] == 1 ? "<ul>" : "<ol>")
+				TEG_list_stack[TEG_list_lvl[0]] = TEG_list_type[0]
 			}
 			str = "<li>" str "</li>"
 		}
 		else {
-			# list type change
-			if (list_type[0] != list_stack[list_lvl[0]]) {
-				liststr = (list_stack[list_lvl[0]] == 1 ? "</ul>" : "</ol>")
-				liststr = liststr (list_type[0] == 1 ? "<ul>" : "<ol>")
-				list_stack[list_lvl[0]] = list_type[0]
+			# List type change
+			if (TEG_list_type[0] != TEG_list_stack[TEG_list_lvl[0]]) {
+				liststr = (TEG_list_stack[TEG_list_lvl[0]] == 1 ? "</ul>" : "</ol>")
+				liststr = liststr (TEG_list_type[0] == 1 ? "<ul>" : "<ol>")
+				TEG_list_stack[TEG_list_lvl[0]] = TEG_list_type[0]
 			}
 			str = "<li>" str "</li>"
 		}
@@ -472,26 +529,26 @@ function md_fmt(str) {
 	if (liststr)
 		str = liststr str
 
-	list_type[1] = list_type[0]
-	list_lvl[1] = list_lvl[0]
+	TEG_list_type[1] = TEG_list_type[0]
+	TEG_list_lvl[1] = TEG_list_lvl[0]
 	#
-	# lists end
+	# Lists end
 	#
 
 	#
-	# add br if there's two consecutive \n
+	# Add br if there's two consecutive \n
 	# (with soooome exclusions)
 	#
-	if (is_null(str) && c_vars["prev_line"] !~ /<\/?(h|ul|ol|pre|p|det)/ && !c_vars["no_br"]) {
+	if (TEG_is_null(str) && TEG_c_vars["prev_line"] !~ /<\/?(h|ul|ol|pre|p|det)/ && !TEG_c_vars["no_br"]) {
 		str = "<br class=\"nl\">"
 	}
-	if (c_vars["no_br"] > 0)
-		c_vars["no_br"] --
+	if (TEG_c_vars["no_br"] > 0)
+		TEG_c_vars["no_br"] --
 
 	#
-	# links and images
+	# Links and images
 	#
-	while (ix = match(str, reglist["md_link"])) {
+	while (ix = match(str, TEG_reglist["md_link"])) {
 		is_image = 0
 		rl = RLENGTH
 		link_md = substr(str, ix, rl)
@@ -513,10 +570,10 @@ function md_fmt(str) {
 	}
 
 	#
-	# spoilers
-	# note: formed like ||[preview text]text inside spoiler||
+	# Spoilers
+	# Note: formed like ||[preview text]text inside spoiler||
 	#
-	while (ix = match(str, reglist["md_spoiler"])) {
+	while (ix = match(str, TEG_reglist["md_spoiler"])) {
 		rl = RLENGTH
 		spoiler_md = substr(str, ix, rl)
 
@@ -529,20 +586,20 @@ function md_fmt(str) {
 		str = start "<details><summary>" preview "</summary>" text "</details>" end
 	}
 
-	c_vars["prev_line"] = str
+	TEG_c_vars["prev_line"] = str
 	return str
 }
 
 #
 # !e element class options
 #
-# place an element (html tag)
-# stores a list of elements in a global variable and closes them after calling
+# Place an element (HTML tag)
+# Stores a list of elements in a global variable and closes them after calling
 # for the same element type w/ no props.
-# 
-# the shot argument determines whether to act as !e, !eo or !eoc
 #
-function calls_e(call, shot,   elem_name,elem_class,elem_props,arg_count) {
+# The shot argument determines whether to act as !e, !eo or !eoc
+#
+function TEG_calls_e(call, shot,   elem_name,elem_class,elem_props,arg_count,id,i) {
 	elem_name = call[1]
 	elem_class = (call[2] ? call[2] : "_")
 	arg_count = 0
@@ -555,36 +612,55 @@ function calls_e(call, shot,   elem_name,elem_class,elem_props,arg_count) {
 	}
 	sub(/^[ \t]+/, "", elem_props)
 
-	elem_name = strip_sp(elem_name)
-	elem_class = strip_sp(elem_class)
-	elem_props = strip_sp(elem_props)
+	elem_name = TEG_strip_sp(elem_name)
+	elem_class = TEG_strip_sp(elem_class)
+	elem_props = TEG_strip_sp(elem_props)
+
+	if (TEG_is_null(elem_name))
+		TEG_logt("empty element", 3)
+
+	# Check if it's an id instead of a class
+	id = 0
+	if (elem_class ~ /^#/) {
+		id = 1
+		elem_class = substr(elem_class, 2)
+
+		if (TEG_id_list[elem_class] == 1)
+			TEG_logt("element id '" elem_class "' already taken", 3)
+	}
 
 	if (shot == 0) {
-		if (!elems[elem_name "_" elem_class]) {
-			logt("new element: '" elem_name "'")
-			elems[elem_name "_" elem_class] = 1
-			c_vars["e_nest_lvl"] ++
+		if (!TEG_elems[elem_name "_" elem_class]) {
+			TEG_logt("new element: '" elem_name "'")
+			TEG_elems[elem_name "_" elem_class] = 1
+			TEG_c_vars["e_nest_lvl"] ++
 			return sprintf("<%s%s%s>\n",
 				elem_name,
-				(elem_class == "_" ? "" : " class=\"" elem_class "\""),
+				(elem_class == "_" ? "" : (id ? " id" : " class")"=\"" elem_class "\""),
 				(elem_props  ? " " elem_props : ""))
 		} else {
-			logt("closing element: '" elem_name "'")
-			elems[elem_name "_" elem_class] = 0
-			c_vars["e_nest_lvl"] --
+			TEG_logt("closing element: '" elem_name "'")
+			TEG_elems[elem_name "_" elem_class] = 0
+			if (id)
+				TEG_id_list[elem_class] = 1
+			TEG_c_vars["e_nest_lvl"] --
 			return "</" elem_name ">"
 		}
 	} else if (shot == 1) {
-		logt("new oneshot (open) element: '" elem_name "'")
+		TEG_logt("new oneshot (open) element: '" elem_name "'")
+		if (id)
+			TEG_id_list[elem_class] = 1
 		return sprintf("<%s%s%s>",
 			elem_name,
-			(elem_class == "_" ? "" : " class=\"" elem_class "\""),
+			(elem_class == "_" ? "" : (id ? " id" : " class")"=\"" elem_class "\""),
 			(elem_props  ? " " elem_props : ""))
 	} else if (shot == 2) {
-		logt("new oneshot (closed) element: '" elem_name "'")
+		TEG_logt("new oneshot (closed) element: '" elem_name "'")
+		if (id)
+			TEG_id_list[elem_class] = 1
 		return sprintf("<%s%s%s></%s>",
 			elem_name,
-			(elem_class == "_" ? "" : " class=\"" elem_class "\""),
+			(elem_class == "_" ? "" : (id ? " id" : " class")"=\"" elem_class "\""),
 			(elem_props  ? " " elem_props : ""),
 			elem_name)
 	}
@@ -593,19 +669,19 @@ function calls_e(call, shot,   elem_name,elem_class,elem_props,arg_count) {
 #
 # !start
 #
-# start the page
-# creates doctype, head, opens body.
+# Start the page
+# Creates doctype, head, opens body.
 #
-function calls_start(call,   str,line,cnt,a) {
+function TEG_calls_start(call,   str,line,cnt,a,i) {
 	str = ""
 
-	if (reached_start)
+	if (TEG_reached_start)
 		return
 
-	if (c_vars["status"]) {
-		str = str     "Status: " c_vars["status"]
-		if (!is_null(c_vars["ctype"]))
-			str = str"\n" "Content-type: " c_vars["ctype"]
+	if (TEG_c_vars["status"]) {
+		str = str "Status: " TEG_c_vars["status"]
+		if (!TEG_is_null(TEG_c_vars["ctype"]))
+			str = str"\n" "Content-type: " TEG_c_vars["ctype"]
 		else
 			str = str"\n" "Content-type: text/html"
 		str = str"\n" "\n"
@@ -613,73 +689,73 @@ function calls_start(call,   str,line,cnt,a) {
 
 	str = str     "<!DOCTYPE html>"
 	str = str"\n" "<!-- https://codeberg.org/9vlc/teg -->"
-	str = str"\n" "<html lang=\"" c_vars["lang"] "\">"
+	str = str"\n" "<html lang=\"" TEG_c_vars["lang"] "\">"
 	str = str"\n" "<head>"
 	str = str"\n" "\t<meta charset=\"UTF-8\">"
 	str = str"\n" "\t<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
-	if (c_vars["embed_og"])
+	if (TEG_c_vars["embed_og"])
 		str = str"\n" "\t<meta property=\"og:type\" content=\"website\">"
 
-	if (c_vars["title"]) {
-		str = str"\n" "\t<title>" c_vars["title"] "</title>"
-		if (c_vars["embed_og"])
-			str = str"\n" "\t<meta property=\"og:title\" content=\"" c_vars["title"] "\">"
-		if (c_vars["embed_twt"])
-			str = str"\n" "\t<meta name=\"twitter:title\" content=\"" c_vars["title"] "\">"
+	if (TEG_c_vars["title"]) {
+		str = str"\n" "\t<title>" TEG_c_vars["title"] "</title>"
+		if (TEG_c_vars["embed_og"])
+			str = str"\n" "\t<meta property=\"og:title\" content=\"" TEG_c_vars["title"] "\">"
+		if (TEG_c_vars["embed_twt"])
+			str = str"\n" "\t<meta name=\"twitter:title\" content=\"" TEG_c_vars["title"] "\">"
 	}
 
-	if (c_vars["description"]) {
-		str = str"\n" "\t<meta name=\"description\" content=\"" c_vars["description"] "\">"
-		if (c_vars["embed_og"])
-			str = str"\n" "\t<meta property=\"og:description\" content=\"" c_vars["description"] "\">"
-		if (c_vars["embed_twt"])
-			str = str"\n" "\t<meta name=\"twitter:description\" content=\"" c_vars["description"] "\">"
+	if (TEG_c_vars["description"]) {
+		str = str"\n" "\t<meta name=\"description\" content=\"" TEG_c_vars["description"] "\">"
+		if (TEG_c_vars["embed_og"])
+			str = str"\n" "\t<meta property=\"og:description\" content=\"" TEG_c_vars["description"] "\">"
+		if (TEG_c_vars["embed_twt"])
+			str = str"\n" "\t<meta name=\"twitter:description\" content=\"" TEG_c_vars["description"] "\">"
 	}
 
-	if (c_vars["embed_img"]) {
-		if (c_vars["embed_og"])
-			str = str"\n" "\t<meta property=\"og:image\" content=\"" c_vars["embed_img"] "\">"
-		if (c_vars["embed_twt"]) {
+	if (TEG_c_vars["embed_img"]) {
+		if (TEG_c_vars["embed_og"])
+			str = str"\n" "\t<meta property=\"og:image\" content=\"" TEG_c_vars["embed_img"] "\">"
+		if (TEG_c_vars["embed_twt"]) {
 			str = str"\n" "\t<meta name=\"twitter:card\" content=\"summary_large_image\">"
-			str = str"\n" "\t<meta name=\"twitter:image\" content=\"" c_vars["embed_img"] "\">"
+			str = str"\n" "\t<meta name=\"twitter:image\" content=\"" TEG_c_vars["embed_img"] "\">"
 		}
 	}
 
-	if (c_vars["color_chrome"])
-		str = str"\n" "\t<meta name=\"theme-color\" content=\"" c_vars["color_chrome"] "\">"
+	if (TEG_c_vars["color_chrome"])
+		str = str"\n" "\t<meta name=\"theme-color\" content=\"" TEG_c_vars["color_chrome"] "\">"
 
-	if (c_vars["icon"])
-		str = str"\n" "\t<link rel=\"icon\" href=\"" c_vars["icon"] "\">"
+	if (TEG_c_vars["icon"])
+		str = str"\n" "\t<link rel=\"icon\" href=\"" TEG_c_vars["icon"] "\">"
 
-	if (c_vars["style"]) {
-		cnt = split(c_vars["style"], a, ";")
+	if (TEG_c_vars["style"]) {
+		cnt = split(TEG_c_vars["style"], a, ";")
 		for (i = 1; i <= cnt; i++)
-			str = str"\n" "\t<link rel=\"stylesheet\" type=\"text/css\" href=\"" strip_sp(a[i]) "\">"
+			str = str"\n" "\t<link rel=\"stylesheet\" type=\"text/css\" href=\"" TEG_strip_sp(a[i]) "\">"
 	}
 
-	if (c_vars["style_inline"]) {
-		logt("starting inline style")
-		str = str"\n" "\t<style>" read_list(c_vars["style_inline"], ";")
+	if (TEG_c_vars["style_inline"]) {
+		TEG_logt("starting inline style")
+		str = str"\n" "\t<style>" TEG_read_list(TEG_c_vars["style_inline"], ";")
 		str = str"\n" "\t</style>"
 	}
 
-	if (c_vars["script"]) {
-		cnt = split(c_vars["script"], a, ";")
+	if (TEG_c_vars["script"]) {
+		cnt = split(TEG_c_vars["script"], a, ";")
 		for (i = 1; i <= cnt; i++)
-			str = str"\n" "\t<script src=\"" strip_sp(a[i]) "\"></script>"
+			str = str"\n" "\t<script src=\"" TEG_strip_sp(a[i]) "\"></script>"
 	}
 
-	reached_start = 1
-	c_vars["no_proc"] ++
+	TEG_reached_start = 1
+	TEG_c_vars["no_proc"] ++
 	str = str"\n" "</head>"
 	str = str"\n" "<body>"
 
 	#
-	# inline scripts must be in body (i believe so)
+	# Inline scripts must be in body (I believe so)
 	#
-	if (c_vars["script_inline"]) {
-		logt("starting inline script")
-		str = str"\n" "\t<script>" read_list(c_vars["script_inline"], ";")
+	if (TEG_c_vars["script_inline"]) {
+		TEG_logt("starting inline script")
+		str = str"\n" "\t<script>" TEG_read_list(TEG_c_vars["script_inline"], ";")
 		str = str"\n" "\t</script>"
 	}
 	return str
@@ -688,14 +764,15 @@ function calls_start(call,   str,line,cnt,a) {
 #
 # !abort exitcode
 #
-# abort execution of a teg script
+# Abort execution of a teg script
+# No return
 #
-function calls_abort(call) {
-	if (!reached_start) {
-		if (c_vars["status"]) {
-			str = str     "Status: " c_vars["status"]
-			if (!is_null(c_vars["ctype"]))
-				str = str"\n" "Content-type: " c_vars["ctype"]
+function TEG_calls_abort(call) {
+	if (!TEG_reached_start) {
+		if (TEG_c_vars["status"]) {
+			str = str     "Status: " TEG_c_vars["status"]
+			if (!TEG_is_null(TEG_c_vars["ctype"]))
+				str = str"\n" "Content-type: " TEG_c_vars["ctype"]
 			else
 				str = str"\n" "Content-type: text/html"
 			str = str"\n" "\n"
@@ -711,12 +788,12 @@ function calls_abort(call) {
 #
 # !exec_raw command ...
 #
-# execute a command and return its output
+# Execute a command and return its output
 #
-function calls_exec_raw(call,   str,line) {
+function TEG_calls_exec_raw(call,   str,line) {
 	str = ""
-	if (is_null(call[0])) {
-		logt("empty !exec_raw command", 3)
+	if (TEG_is_null(call[0])) {
+		TEG_logt("empty !exec_raw command", 3)
 		return
 	}
 
@@ -730,18 +807,18 @@ function calls_exec_raw(call,   str,line) {
 #
 # !exec_fmt command ...
 #
-# same as before, just place the output in a codeblock
+# Same as before, just place the output in a codeblock
 #
-function calls_exec_fmt(call,   str,line,tmp,i,c) {
+function TEG_calls_exec_fmt(call,   str,line,tmp,i,c) {
 	c = 0
 	str = ""
-	if (is_null(call[0])) {
-		logt("empty !exec_fmt command", 3)
+	if (TEG_is_null(call[0])) {
+		TEG_logt("empty !exec_fmt command", 3)
 		return
 	}
 
 	#
-	# copying the exec_inc approach here "just in case"
+	# Copying the exec_inc approach here "just in case"
 	#
 	while((call[0] | getline line) > 0) {
 		tmp[c] = line
@@ -750,29 +827,29 @@ function calls_exec_fmt(call,   str,line,tmp,i,c) {
 	close(call[0])
 
 	for (i = 0; i < c; i++)
-		str = str escape_html(tmp[i]) "\n"
+		str = str TEG_escape_html(tmp[i]) "\n"
 
-	c_vars["no_proc"] ++
+	TEG_c_vars["no_proc"] ++
 	return "<pre class=\"cb-pre\"><code class=\"cb-code\">" str "</code></pre>"
 }
 
 #
 # !exec_inc command ...
 #
-# execute a command and include (tegproc) its output
+# Execute a command and include (TEG_proc) its output
 #
-function calls_exec_inc(call,   str,line,tmp,i,c) {
+function TEG_calls_exec_inc(call,   str,line,tmp,i,c) {
 	c = 0
 	str = ""
-	if (is_null(call[0])) {
-		logt("empty !exec_raw command", 3)
+	if (TEG_is_null(call[0])) {
+		TEG_logt("empty !exec_raw command", 3)
 		return
 	}
 
 	#
-	# must separate getline and tegproc else we get a nasty
+	# Must separate getline and TEG_proc else we get a nasty
 	# vulnerability on gawk because of pipe propagation
-	# (i should probably report this someday???)
+	# (I should probably report this someday???)
 	#
 	while((call[0] | getline line) > 0) {
 		tmp[c] = line
@@ -781,38 +858,38 @@ function calls_exec_inc(call,   str,line,tmp,i,c) {
 	close(call[0])
 
 	for (i = 0; i < c; i++)
-		str = str tegproc(tmp[i])
+		str = str TEG_proc(tmp[i])
 
-	c_vars["no_proc"] ++
+	TEG_c_vars["no_proc"] ++
 	return str
 }
 
 #
 # !var variable=value
 #
-# set variable to value.
-# if value is not provided
+# Set variable to value.
+# If value is not provided
 #
-function calls_var(call,   eqpos,key,value,marker) {
+function TEG_calls_var(call,   eqpos,key,value,marker) {
 	eqpos = index(call[0], "=")
 
 	if (!eqpos) {
 		eqpos = index(call[0], "<")
 		if (!eqpos)
-			return c_vars[key]
+			return TEG_c_vars[key]
 
 		# < logic
 		key = substr(call[0], 1, eqpos - 1)
 		marker = substr(call[0], eqpos + 1)
 
-		# can only have up to one at the same time, sorry
-		if (var_long)
-			logt("can't do two long variables", 3)
+		# Can only have up to one at the same time, sorry
+		if (TEG_var_long)
+			TEG_logt("can't do two long variables", 3)
 		else {
-			var_long = key"<"marker
-			logt("long var: '"var_long"'")
+			TEG_var_long = key"<"marker
+			TEG_logt("long var: '"TEG_var_long"'")
 		}
-		c_vars["no_br"] ++
+		TEG_c_vars["no_br"] ++
 		return
 	}
 
@@ -821,63 +898,76 @@ function calls_var(call,   eqpos,key,value,marker) {
 	value = substr(call[0], eqpos + 1)
 
 	if (value ~ /^-?[0-9]+$/)
-		c_vars[key] = value + 0
+		TEG_c_vars[key] = value + 0
 	else
-		c_vars[key] = value
+		TEG_c_vars[key] = value
 
-	logt("'"key"' = ""'"value"'")
-	c_vars["no_br"] ++
+	TEG_logt("'"key"' = ""'"value"'")
+	TEG_c_vars["no_br"] ++
 	return
 }
 
 #
 # !inc file
 #
-# include a file
-# this was the most difficult call to implement
+# Include a file
+# This was the most difficult call to implement
 #
-function calls_inc(call,   inc_file,line,prev_file,str) {
-	logt("including '" call[0] "'")
-	inc_file = relpath(call[0])
+function TEG_calls_inc(call,   inc_file,line,prev_file,str) {
+	TEG_logt("including '" call[0] "'")
+	inc_file = TEG_relpath(call[0])
 
-	if (!exists(inc_file)) {
-		logt("teg file '" inc_file "' does not exist", 3)
+	if (!TEG_exists(inc_file)) {
+		TEG_logt("teg file '" inc_file "' does not exist", 3)
 		return
 	}
 
 	str = ""
-	c_vars["no_br"] ++
-	prev_file = c_vars["file"]
-	c_vars["file"] = inc_file
+	TEG_c_vars["no_br"] ++
+	prev_file = TEG_c_vars["file"]
+	TEG_c_vars["file"] = inc_file
 
 	while ((getline line < inc_file) > 0) {
-		str = str tegproc(line)
+		str = str TEG_proc(line)
 	}
 	close(inc_file)
 
-	c_vars["file"] = prev_file
-	c_vars["no_proc"] ++
+	TEG_c_vars["file"] = prev_file
+	TEG_c_vars["no_proc"] ++
 	return str
 }
 
 #
-# run a call
+# !log text
 #
+# Prints text to stderr
+#
+function TEG_calls_log(call) {
+	print call[0] > "/dev/stderr"
+	TEG_c_vars["no_br"] ++
+	return
+}
+
+#
+# Run a call
+# 
+# explicit = 1 - Process the call even before !start
+# 
 # call["name"] - call name
 # call[0]      - concat args
 # call[1+]     - args
 #
-function callproc(str, explicit,   len,call,long_key,long_marker,delim,nope) {
-	if (c_vars["no_proc"])
+function TEG_callproc(str, explicit,   len,call,long_key,long_marker,delim,nope,i) {
+	if (TEG_c_vars["no_proc"])
 		return str
-	
-	# still process even if no_proc or inside_codeblock are set
+
+	# Still process even if no_proc or inside_codeblock are set
 	explicit = (explicit ? 1 : 0)
 
-	if (var_long) {
-		delim = index(var_long, "<")
-		long_key = substr(var_long, 1, delim - 1)
-		long_marker = substr(var_long, delim + 1)
+	if (TEG_var_long) {
+		delim = index(TEG_var_long, "<")
+		long_key = substr(TEG_var_long, 1, delim - 1)
+		long_marker = substr(TEG_var_long, delim + 1)
 	}
 
 	nope = 0
@@ -885,7 +975,7 @@ function callproc(str, explicit,   len,call,long_key,long_marker,delim,nope) {
 		len = split(substr(str, 2), call, " ")
 	else if (explicit)
 		len = split(str, call, " ")
-	else if (var_long)
+	else if (TEG_var_long)
 		nope = 1
 	else
 		return str
@@ -898,51 +988,52 @@ function callproc(str, explicit,   len,call,long_key,long_marker,delim,nope) {
 		}
 		call[len] = ""
 
-		# do not run if...
-		if (!explicit && (c_vars["no_proc"] || c_vars["inside_codeblock"]))
+		# Do not run if...
+		if (!explicit && (TEG_c_vars["no_proc"] || TEG_c_vars["inside_codeblock"]))
 			return str
-		# another pre-start call whitelist here
-		else if (!explicit && !reached_start && !var_long && call["name"] !~ /(inc|exec_inc|var|start|abort)/) {
-			logt("skipping data before start call", 2)
+		else if (!explicit && !TEG_reached_start && !TEG_var_long && call["name"] !~ TEG_before_start_list) {
+			TEG_logt("skipping data before start call", 2)
 			return
 		}
 
 		if (call["name"] == "start")
-			str = calls_start(call)
+			str = TEG_calls_start(call)
 		else if (call["name"] == "abort")
-			str = calls_abort(call)
+			str = TEG_calls_abort(call)
 		else if (call["name"] == "e")
-			str = calls_e(call, 0)
+			str = TEG_calls_e(call, 0)
 		else if (call["name"] == "eo")
-			str = calls_e(call, 1)
+			str = TEG_calls_e(call, 1)
 		else if (call["name"] == "eoc")
-			str = calls_e(call, 2)
+			str = TEG_calls_e(call, 2)
 		else if (call["name"] == "exec_raw")
-			str = calls_exec_raw(call)
+			str = TEG_calls_exec_raw(call)
 		else if (call["name"] == "exec_fmt")
-			str = calls_exec_fmt(call)
+			str = TEG_calls_exec_fmt(call)
 		else if (call["name"] == "exec_inc")
-			str = calls_exec_inc(call)
+			str = TEG_calls_exec_inc(call)
 		else if (call["name"] == "var")
-			str = calls_var(call)
+			str = TEG_calls_var(call)
 		else if (call["name"] == "inc")
-			str = calls_inc(call)
+			str = TEG_calls_inc(call)
+		else if (call["name"] == "log")
+			str = TEG_calls_log(call)
 		else
-			logt("unknown call: '" call["name"] "'", 2)
+			TEG_logt("unknown call: '" call["name"] "'", 2)
 	}
 
-	# if we're doing a !var name<EOL
-	if (var_long && long_marker) {
+	# If we're doing a !var name<EOL
+	if (TEG_var_long && long_marker) {
 		if (str == long_marker) {
-			var_long = ""
-			logt("str: "str" marker: "long_marker)
-			c_vars["no_br"] ++ # +2
-			c_vars[long_key] = c_vars[long_key] md_fmt("")
+			TEG_var_long = ""
+			TEG_logt("str: "str" marker: "long_marker)
+			TEG_c_vars["no_br"] ++ # +2
+			TEG_c_vars[long_key] = TEG_c_vars[long_key] TEG_md_fmt("")
 		}
 		else
-			c_vars[long_key] = c_vars[long_key] md_fmt(str) "\n"
+			TEG_c_vars[long_key] = TEG_c_vars[long_key] TEG_md_fmt(str) "\n"
 
-		c_vars["no_br"] ++
+		TEG_c_vars["no_br"] ++
 		return
 	}
 
@@ -950,18 +1041,18 @@ function callproc(str, explicit,   len,call,long_key,long_marker,delim,nope) {
 }
 
 #
-# expand inline variables and calls
-# inline variable: {$var_name$}
-# inline call: {!call_name args ...!}
+# Expand inline variables and calls
+# Inline variable: {$var_name$}
+# Inline call: {!call_name args ...!}
 #
-function expand_inline(str,   ret,parts,i) {
-	if (c_vars["no_proc"])
+function TEG_expand_inline(str,   ret,parts,i) {
+	if (TEG_c_vars["no_proc"])
 		return str
 	#
-	# first expand all variables
+	# First expand all variables
 	#
-	if (str ~ reglist["var_inline"]) {
-		ret = split_surround(parts, str, reglist["var_inline"], 2)
+	if (str ~ TEG_reglist["var_inline"]) {
+		ret = TEG_split_surround(parts, str, TEG_reglist["var_inline"], 2)
 		str = ""
 		for (i = 1; i <= ret*2+1; i++)
 			if (i % 2)
@@ -969,14 +1060,14 @@ function expand_inline(str,   ret,parts,i) {
 			else if (substr(parts[i-1], length(parts[i-1]), 1) == "\\")
 				str = substr(str, 1, length(str) - 1) "&#123;&#36;" parts[i] "&#36;&#125;"
 			else
-				str = str c_vars[parts[i]]
+				str = str TEG_c_vars[parts[i]]
 	}
 
 	#
-	# then run the calls
+	# Then run the calls
 	#
-	if (str ~ reglist["call_inline"]) {
-		ret = split_surround(parts, str, reglist["call_inline"], 2)
+	if (str ~ TEG_reglist["call_inline"]) {
+		ret = TEG_split_surround(parts, str, TEG_reglist["call_inline"], 2)
 		str = ""
 		for (i = 1; i <= ret*2+1; i++)
 			if (i % 2)
@@ -984,74 +1075,89 @@ function expand_inline(str,   ret,parts,i) {
 			else if (substr(parts[i-1], length(parts[i-1]), 1) == "\\")
 				str = substr(str, 1, length(str) - 1) "&#123;&#33;" parts[i] "&#33;&#125;"
 			else
-				str = str callproc(parts[i], 1)
+				str = str TEG_callproc(parts[i], 1)
 	}
 
 	return str
 }
 
 #
-# the main teg processor function
+# The main teg processor function
 #
-function tegproc(str) {
-	c_vars["curr_line"] = str
-	
-	if (str ~ /^==/ && !c_vars["inside_codeblock"] && !c_vars["no_proc"])
+function TEG_proc(str) {
+	if (!TEG_init_done) {
+		TEG_logt("called TEG_proc() without prior TEG_init()", 3)
+		exit(1)
+	}
+
+	TEG_c_vars["curr_line"] = str
+
+	if (str ~ /^==/ && !TEG_c_vars["inside_codeblock"] && !TEG_c_vars["no_proc"])
 		return
 
-	if (!reached_start && !var_long) {
-		# pre-start call whitelist
-		if (str ~ /^!(start|abort|var|inc|exec_inc)/) {
-			str = expand_inline(str)
-			str = callproc(str)
+	if (!TEG_reached_start && !TEG_var_long) {
+		# Pre-start call whitelist
+		if (str ~ "^!"TEG_before_start_list) {
+			str = TEG_expand_inline(str)
+			str = TEG_callproc(str)
 		}
-		else if (var_long)
-			str = callproc(str)
+		else if (TEG_var_long)
+			str = TEG_callproc(str)
 		else if (str ~ /^[ \t]*$/)
 			return
 		else {
-			logt("skipping data before start call", 2)
+			TEG_logt("skipping data before start call", 2)
 			return
 		}
 	}
 
-	if (c_vars["escape"])
-		str = escape_html_wrap(str)
-	str = expand_inline(str)
-	str = callproc(str)
-	if (!var_long)
-		str = md_fmt(str)
+	if (TEG_c_vars["escape"])
+		str = TEG_escape_html_wrap(str)
+	str = TEG_expand_inline(str)
+	str = TEG_callproc(str)
+	if (!TEG_var_long)
+		str = TEG_md_fmt(str)
 
 	# New special case for codeblocks (makes html less prettier but idc)
-	if (c_vars["inside_codeblock"])
+	if (TEG_c_vars["inside_codeblock"])
 		str = "\n" str
-	else if ((c_vars["curr_line"] !~ /^![^ \t].+/) && !var_long)
+	else if ((TEG_c_vars["curr_line"] !~ /^![^ \t].+/) && !TEG_var_long)
 		str = str "\n"
 
-	if (c_vars["no_proc"] && c_vars["no_proc"] ~ /^[0-9]+$/)
-		c_vars["no_proc"] --
-	else if (c_vars["curr_line"] == c_vars["no_proc"]) {
-		c_vars["no_proc"] = 0
+	if (TEG_c_vars["no_proc"] && TEG_c_vars["no_proc"] ~ /^[0-9]+$/)
+		TEG_c_vars["no_proc"] --
+	else if (TEG_c_vars["curr_line"] == TEG_c_vars["no_proc"]) {
+		TEG_c_vars["no_proc"] = 0
 		return
 	}
 
-	c_vars["prev_line"] = str
+	TEG_c_vars["prev_line"] = str
 	return str
 }
 
-END {
-	if (reached_start) {
-		# cleanly finish all pending markdown work
-		c_vars["no_br"] ++
-		md_fmt("")
-		print "</body>"
-		print "</html>"
+function TEG_end() {
+	if (TEG_reached_start) {
+		# Cleanly finish all pending markdown work
+		TEG_c_vars["no_br"] ++
+		TEG_md_fmt("")
+		return "</body></html>"
 	}
 }
 
 #
-# the awk's "main" function
+# If we're running standalone teg
 #
+BEGIN {
+	if (!TEG_AS_LIBRARY)
+		TEG_init()
+}
+
 {
-	printf("%s", tegproc($0))
+	if (!TEG_AS_LIBRARY)
+		printf("%s", TEG_proc($0))
+}
+
+END {
+	if (!TEG_AS_LIBRARY)
+		printf("%s\n", TEG_end())
 }

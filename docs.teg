@@ -1,3 +1,7 @@
+!var name=
+!var style_inline=extra/style.css
+!start
+
 # What's teg?
 teg is a small *(~700 LOC by `cloc`, ~1000 lines total)* portable web "[anti-framework](https://werc.cat-v.org)" foundation made in AWK,
 compatible with pretty much all AWKs out there, so you can even use teg on [Plan 9](https://en.wikipedia.org/wiki/Plan_9_from_Bell_Labs).
@@ -93,7 +97,12 @@ Execute a command and include its output as teg
 
 > !**inc** *file*
 
-Include a file
+Include a filea
+
+
+> !**log** *text*
+
+Print text to stderr
 
 
 > !**e** *element* *class* *options*
@@ -101,6 +110,8 @@ Include a file
 Open an HTML tag on first call, remember the class, and close the tag on the second call for the same class
 
 If *class* is "_", the HTML tag does not receive a class
+
+If *class* starts with #, assign an HTML ID instead. If you try to create two elements with the same ID, an error is thrown
 
 The *options* get passed to the HTML tag like so: `!e div _ style="font-size: 90%;"` -> `<div style="font-size: 90%;">`
 
@@ -193,12 +204,12 @@ Add an image embed
 Must be a link to a website
 
 
-> **embed_og**=*1*
+> **embed_og**=*0*
 
 Enable OpenGraph embeds (`<meta property="og:.." ...>`)
 
 
-> **embed_twt**=*1*
+> **embed_twt**=*0*
 
 Enable Twitter embeds (`<meta name="twitter:.." ...>`)
 
@@ -210,7 +221,7 @@ This is used by Discord for large image embeds
 
 > **icon**
 
-Favicon
+Favicon path
 
 
 > **style**
@@ -323,3 +334,137 @@ Line 4?
 ```
 ~~strikethrough!~~
 
+
+# Library usage
+teg can be used as a library in GAWK.
+For that, you need to first define `TEG_AS_LIBRARY = 1`, then include `teg.awk` like so:
+```
+BEGIN { TEG_AS_LIBRARY = 1 }
+@include "teg.awk"
+```
+
+Some of the more useful functions you get access to are:
+
+
+> **TEG_init**()
+
+Initialize teg
+
+
+> **TEG_proc**(*src*) 
+
+Process a line, returns formatted line
+
+
+> **TEG_end**()
+
+Finalize processing, returns end of HTML
+
+
+> **TEG_md_fmt**(*str*)
+
+Convert markdown to HTML, returns converted HTML
+
+If you use this alone, remember to provide it an empty string at the end of processing to close all lists and codeblocks
+
+
+> **TEG_callproc**(*str*, *explicit*)
+
+Process a teg call, return its output
+
+Set *explicit* to 1 to run the processing even if we've not reached `!start` yet
+
+
+> **TEG_read_list**(*list*, *delim*)
+
+Read each file from a list delimited by *delim* and return all of their contents
+
+
+> **TEG_escape_html**(*str*)
+
+Escape some symbols in string for inclusion in HTML, returns escaped string
+
+
+> **TEG_MARK**(*optional_str*)
+
+Print a marker to stderr with a number incrementing each call, useful for debugging
+
+
+> **TEG_explode_arr**(*array*)
+
+Pretty print for arrays, useful for debugging
+
+
+> **TEG_logt**(*str*, *type*)
+
+Debug, warning and error logging
+
+
+*type* = 1 or unset: Debug log
+
+*type* 2: Warning
+
+*type* = 3: Error
+
+
+If `TEG_c_vars["exit_on_error"]` is set to 1 and an error is logged, the script will exit
+
+
+> **TEG_relpath**(*path*)
+
+Complete the input path with currently running/included teg script's path and return a relative path to the file
+
+Returns the completed path
+
+
+> **TEG_exists**(*file*)
+
+Check if a file exists, returns 1 if yes and 0 if no
+
+
+> **TEG_is_null**(*str*)
+
+Check if a string is empty or made of purely whitespace, returns 1 if yes and 0 if not
+
+--------
+
+Some of the useful variables you get access to are:
+
+
+> **TEG_c_vars**[]
+
+The variables you can set with `!var`
+
+
+> **TEG_reglist**[]
+
+An array of various REGEX for matching various things
+
+
+> **TEG_list_type**[*0*,*1*]
+
+Current and previous markdown list types
+
+
+1 - Unordered
+
+2 - Ordered
+
+
+> **TEG_list_lvl**[*0*,*1*]
+
+Current and previous markdown list levels
+
+
+> **TEG_blockquote_lvl**[*0*,*1*]
+
+Current and previous markdown blockquote levels
+
+------------
+
+You can find an example in the teg repository at `extra/library_use.awk`.
+
+
+Before using any of the more complex functions like `TEG_md_fmt()` or `TEG_proc()` make sure to run `TEG_init()` to prepare all variables they expect.
+
+After you're done processing a chunk of text with `TEG_proc()`, run `TEG_end()` *(and print / append its return)* to put the finishing HTML.
