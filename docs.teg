@@ -97,7 +97,7 @@ Execute a command and include its output as teg
 
 > !**inc** *file*
 
-Include a filea
+Include a file
 
 
 > !**log** *text*
