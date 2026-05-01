@@ -9,7 +9,7 @@ adding hundreds more lines of code to teg.
 *(example: inline calls cannot contain a `!` inside)*
 
 # Documentation
-Refer to `docs.teg` (convert to html using `./teg docs.teg > docs.html`)
+Refer to `docs.teg` (convert to html using `./teg.awk docs.teg > docs.html`)
 
 # How do I use this
 Manually convert a .teg file into .html:
