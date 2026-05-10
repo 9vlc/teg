@@ -61,6 +61,18 @@ function TEG_init() {
 	TEG_var_long = ""
 	# List of HTML element with assigned IDs
 	TEG_id_list[""] = 0
+	# Last opened element by !e
+	TEG_last_elem = ""
+	# Current unprocessed line
+	TEG_curr_line = ""
+	# Previous processed line
+	TEG_prev_line = "<h"
+	# Current element nesting level
+	TEG_e_nest_lvl = 0
+	# Are we inside a <pre>?
+	TEG_inside_pre = 0
+	# Are we inside a codeblock?
+	TEG_inside_codeblock = 0
 
 
 	# REGEX for different things
@@ -109,18 +121,6 @@ function TEG_init() {
 	TEG_c_vars["script"] = 0
 	TEG_c_vars["script_inline"] = 0
 
-	# Current unprocessed line
-	TEG_c_vars["curr_line"] = ""
-	# Previous processed line
-	TEG_c_vars["prev_line"] = "<h"
-
-	# Current element nesting level
-	TEG_c_vars["e_nest_lvl"] = 0
-	# Are we inside a <pre>?
-	TEG_c_vars["inside_pre"] = 0
-	# Are we inside a codeblock?
-	TEG_c_vars["inside_codeblock"] = 0
-
 	# Color accent (hex) for mobile chromium and some social media embeds
 	TEG_c_vars["color_chrome"] = 0
 	# URL of an image to embed for social media
@@ -136,7 +136,6 @@ function TEG_init() {
 	TEG_c_vars["ctype"] = "text/html"
 	# Color accent for mobile chromium and some social media embeds
 	TEG_c_vars["color_chrome"] = 0
-
 }
 
 #
@@ -368,20 +367,20 @@ function TEG_md_fmt(str,   indent_len,blockstr,i,start,liststr,ix,rl,link_md,is_
 	#
 	# Codeblocks
 	#
-	if (TEG_c_vars["inside_codeblock"]) {
-		if (TEG_c_vars["inside_codeblock"] == 2) {
-			TEG_c_vars["inside_codeblock"] = 1
-			TEG_c_vars["inside_pre"] = 1
+	if (TEG_inside_codeblock) {
+		if (TEG_inside_codeblock == 2) {
+			TEG_inside_codeblock = 1
+			TEG_inside_pre = 1
 			return "<pre class=\"cb-pre\"><code class=\"cb-code\">" str
 		} else if (str == "```") {
-			TEG_c_vars["inside_codeblock"] = 0
-			TEG_c_vars["inside_pre"] = 0
+			TEG_inside_codeblock = 0
+			TEG_inside_pre = 0
 			return "</code></pre>"
 		}
 		return str
 	} else if (str == "```") {
 		# Initialize the codeblock on the next line
-		TEG_c_vars["inside_codeblock"] = 2
+		TEG_inside_codeblock = 2
 		return
 	}
 
@@ -539,7 +538,7 @@ function TEG_md_fmt(str,   indent_len,blockstr,i,start,liststr,ix,rl,link_md,is_
 	# Add br if there's two consecutive \n
 	# (with soooome exclusions)
 	#
-	if (TEG_is_null(str) && TEG_c_vars["prev_line"] !~ /<\/?(h|ul|ol|pre|p|det)/ && !TEG_c_vars["no_br"]) {
+	if (TEG_is_null(str) && TEG_prev_line !~ /<\/?(h|ul|ol|pre|p|det)/ && !TEG_c_vars["no_br"]) {
 		str = "<br class=\"nl\">"
 	}
 	if (TEG_c_vars["no_br"] > 0)
@@ -586,7 +585,7 @@ function TEG_md_fmt(str,   indent_len,blockstr,i,start,liststr,ix,rl,link_md,is_
 		str = start "<details><summary>" preview "</summary>" text "</details>" end
 	}
 
-	TEG_c_vars["prev_line"] = str
+	TEG_prev_line = str
 	return str
 }
 
@@ -599,7 +598,7 @@ function TEG_md_fmt(str,   indent_len,blockstr,i,start,liststr,ix,rl,link_md,is_
 #
 # The shot argument determines whether to act as !e, !eo or !eoc
 #
-function TEG_calls_e(call, shot,   elem_name,elem_class,elem_props,arg_count,id,i) {
+function TEG_calls_e(call, shot,   elem_name,elem_class,elem_props,arg_count,final,id,i) {
 	elem_name = call[1]
 	elem_class = (call[2] ? call[2] : "_")
 	arg_count = 0
@@ -616,7 +615,7 @@ function TEG_calls_e(call, shot,   elem_name,elem_class,elem_props,arg_count,id,
 	elem_class = TEG_strip_sp(elem_class)
 	elem_props = TEG_strip_sp(elem_props)
 
-	if (TEG_is_null(elem_name))
+	if (TEG_is_null(elem_name) && shot != 0)
 		TEG_logt("empty element", 3)
 
 	# Check if it's an id instead of a class
@@ -629,12 +628,24 @@ function TEG_calls_e(call, shot,   elem_name,elem_class,elem_props,arg_count,id,
 			TEG_logt("element id '" elem_class "' already taken", 3)
 	}
 
-	if (shot == 0) {
+	# Close the last tag on plain "!e"
+	if (shot == 0 && TEG_is_null(elem_name)) {
+		if (TEG_is_null(TEG_last_elem))
+			TEG_logt("we haven't opened an element yet!", 3)
+		if (!TEG_elems[TEG_last_elem])
+			TEG_logt("last element was already closed", 3)
+		final = "</" substr(TEG_last_elem, 1, index(TEG_last_elem, "_") - 1) ">"
+		TEG_elems[TEG_last_elem] = 0
+	}
+
+	# Otherwise do this mess
+	if (shot == 0 && TEG_is_null(final)) {
 		if (!TEG_elems[elem_name "_" elem_class]) {
 			TEG_logt("new element: '" elem_name "'")
 			TEG_elems[elem_name "_" elem_class] = 1
-			TEG_c_vars["e_nest_lvl"] ++
-			return sprintf("<%s%s%s>\n",
+			TEG_e_nest_lvl ++
+			TEG_last_elem = elem_name "_" elem_class
+			final = sprintf("<%s%s%s>\n",
 				elem_name,
 				(elem_class == "_" ? "" : (id ? " id" : " class")"=\"" elem_class "\""),
 				(elem_props  ? " " elem_props : ""))
@@ -643,14 +654,14 @@ function TEG_calls_e(call, shot,   elem_name,elem_class,elem_props,arg_count,id,
 			TEG_elems[elem_name "_" elem_class] = 0
 			if (id)
 				TEG_id_list[elem_class] = 1
-			TEG_c_vars["e_nest_lvl"] --
-			return "</" elem_name ">"
+			TEG_e_nest_lvl --
+			final = "</" elem_name ">"
 		}
 	} else if (shot == 1) {
 		TEG_logt("new oneshot (open) element: '" elem_name "'")
 		if (id)
 			TEG_id_list[elem_class] = 1
-		return sprintf("<%s%s%s>",
+		final = sprintf("<%s%s%s>",
 			elem_name,
 			(elem_class == "_" ? "" : (id ? " id" : " class")"=\"" elem_class "\""),
 			(elem_props  ? " " elem_props : ""))
@@ -658,12 +669,14 @@ function TEG_calls_e(call, shot,   elem_name,elem_class,elem_props,arg_count,id,
 		TEG_logt("new oneshot (closed) element: '" elem_name "'")
 		if (id)
 			TEG_id_list[elem_class] = 1
-		return sprintf("<%s%s%s></%s>",
+		final = sprintf("<%s%s%s></%s>",
 			elem_name,
 			(elem_class == "_" ? "" : (id ? " id" : " class")"=\"" elem_class "\""),
 			(elem_props  ? " " elem_props : ""),
 			elem_name)
 	}
+	
+	return final
 }
 
 #
@@ -989,7 +1002,7 @@ function TEG_callproc(str, explicit,   len,call,long_key,long_marker,delim,nope,
 		call[len] = ""
 
 		# Do not run if...
-		if (!explicit && (TEG_c_vars["no_proc"] || TEG_c_vars["inside_codeblock"]))
+		if (!explicit && (TEG_c_vars["no_proc"] || TEG_inside_codeblock))
 			return str
 		else if (!explicit && !TEG_reached_start && !TEG_var_long && call["name"] !~ TEG_before_start_list) {
 			TEG_logt("skipping data before start call", 2)
@@ -1090,9 +1103,9 @@ function TEG_proc(str) {
 		exit(1)
 	}
 
-	TEG_c_vars["curr_line"] = str
+	TEG_curr_line = str
 
-	if (str ~ /^==/ && !TEG_c_vars["inside_codeblock"] && !TEG_c_vars["no_proc"])
+	if (str ~ /^==/ && !TEG_inside_codeblock && !TEG_c_vars["no_proc"])
 		return
 
 	if (!TEG_reached_start && !TEG_var_long) {
@@ -1119,19 +1132,19 @@ function TEG_proc(str) {
 		str = TEG_md_fmt(str)
 
 	# New special case for codeblocks (makes html less prettier but idc)
-	if (TEG_c_vars["inside_codeblock"])
+	if (TEG_inside_codeblock)
 		str = "\n" str
-	else if ((TEG_c_vars["curr_line"] !~ /^![^ \t].+/) && !TEG_var_long)
+	else if ((TEG_curr_line !~ /^![^ \t].+/) && !TEG_var_long)
 		str = str "\n"
 
 	if (TEG_c_vars["no_proc"] && TEG_c_vars["no_proc"] ~ /^[0-9]+$/)
 		TEG_c_vars["no_proc"] --
-	else if (TEG_c_vars["curr_line"] == TEG_c_vars["no_proc"]) {
+	else if (TEG_curr_line == TEG_c_vars["no_proc"]) {
 		TEG_c_vars["no_proc"] = 0
 		return
 	}
 
-	TEG_c_vars["prev_line"] = str
+	TEG_prev_line = str
 	return str
 }
 

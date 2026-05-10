@@ -1,0 +1,100 @@
+h1, h2, h3, h4, h5, h6 {
+	text-decoration: lightgray wavy underline;
+}
+
+summary {
+	cursor: crosshair;
+	text-decoration: #ed0 wavy underline;
+}
+
+summary::before {
+	content: '!';
+	color: #ba0;
+}
+
+summary::after {
+	content: '!';
+	color: #ba0;
+}
+
+summary:hover {
+	background: #ffd;
+}
+
+em {
+	color: #555;
+	text-decoration: lightgray wavy underline;
+}
+
+a {
+	color: black;
+	cursor: crosshair;
+	text-decoration: #36a wavy underline;
+
+}
+
+a:hover {
+	font-style: italic;
+	background: #def;
+}
+
+body {
+	font-family: monospace;
+	font-size: 12pt;
+	background: white;
+	margin: 1em;
+
+}
+
+body::selection {
+	background: #fc6;
+}
+
+*::-webkit-scrollbar {
+	width: 12px;
+	height: 12px;
+}
+
+*::-webkit-scrollbar-thumb {
+	border: 2px solid black;
+	background: repeating-linear-gradient(
+		45deg,
+		#ed0, #ed0 5px,
+		black 5px, black 10px
+	);
+}
+
+pre {
+	padding: 0.5em;
+	border: 3px dashed #034;
+	font-size: 12pt;
+	font-style: bold;
+	overflow: auto;
+
+	background: #368;
+	color: white;
+	font-weight: bold;
+
+}
+
+pre::selection {
+	background: #acd;
+	color: black;
+}
+
+pre::-webkit-scrollbar {
+	width: 8px;
+	height: 8px;
+}
+
+pre::-webkit-scrollbar-thumb {
+	border: unset;
+	border-top: 4px dotted white;
+	background: transparent;
+}
+
+blockquote {
+	border-left: 0.25em solid gray;
+	padding: 0 0.2em;
+	margin: 0;
+}

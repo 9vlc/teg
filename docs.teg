@@ -1,7 +1,8 @@
-!var name=teg documentation
+== I can get away with including this file on the main site
+== (!start is ignored on second call)
+!var title=teg documentation
 !var style_inline=extra/style.css
 !start
-
 # What's teg?
 teg is a small *(~700 LOC by `cloc`, ~1000 lines total)* portable web "[anti-framework](https://werc.cat-v.org)" foundation made in AWK,
 compatible with pretty much all AWKs out there, so you can even use teg on [Plan 9](https://en.wikipedia.org/wiki/Plan_9_from_Bell_Labs).
@@ -11,11 +12,6 @@ teg is meant to be a minimal building block for your full website; it only acts 
 You can piece together teg with your own scripts and programs to, for example, make a full-on [CGI](https://en.wikipedia.org/wiki/Common_Gateway_Interface) system.
 teg can be used with a [Makefile](https://en.wikipedia.org/wiki/Make_(software)) to generate a static site from a list of `.teg` files.
 
-
-The current implementation of teg consists of several discrete parts:
-- teg processor
-- Markdown processor
-- Call and variable processor
 
 # Why's teg?
 I wanted a simple framework for my website to not write everything in HTML by hand.
@@ -31,7 +27,7 @@ as something serious like I'm going to pitch it to a company. Sorry, no I won't.
 Let's have fun and more.
 
 # Naming
-teg is always typed lowercase.
+teg is always typed lowercase (okay, all uppercase in the code for library use)
 
 teg is named as a reference to the Russian name for graffiti tags *(тег, теггинг)* and their crudeness, just like teg itself.
 
@@ -53,77 +49,104 @@ Calls are defined with an exclamation mark at the start of a line:
 ```
 If the call exists, it will be executed, and the line replaced with the call's return.
 
-The current implemented calls are:
+The calls can be categorized into a couple of groups:
 
+### Basics
 
 > !**var** *variable*=*value*
->
-> !**var** *variable*<*delim*
 
 Set *variable* to *value*
 
 If *value* is not set but an equals sign exists, clear *variable*
 
+The **var** call also supports using a heredoc-like syntax to input long multiline variables:
 
-The **var** call also supports using a heredoc-like syntax to input long multiline variables.
+> !**var** *variable*<*delim*
+>
+> *...*
+>
+> *delim*
 
+The variable is being filled with the contents of all the following lines until a line consisting of just "*delim*" is found.
+
+--------------------
 
 > !**start**
 
 Declare the start of the webpage.
 
-You can only use !**inc** and !**var** before !**start**
+You cannot use element-related and **exec** calls (for the exception of **!exec_inc**) before calling **!start**
 
+--------------------
 
 > !**abort** *exit code*
 
-Cleanly abort execution
+Cleanly abort execution, return *exit code*
 
-
-> !**exec_raw** *command*
-
-Run a *command* in your system's command interpreter and give its output to the Markdown processor
-
-
-> !**exec_fmt** *command*
-
-Run a *command* and paste its output as a code block. Disables the Markdown processor for the contents of the code block
-
-
-> !**exec_inc** *command*
-
-Execute a command and include its output as teg
-
+--------------------
 
 > !**inc** *file*
 
 Include a file
 
+--------------------
 
 > !**log** *text*
 
 Print text to stderr
 
+### Exec
+
+> !**exec_raw** *command*
+
+Run a *command* in your system's command interpreter and give its output to the Markdown processor
+
+--------------------
+
+> !**exec_fmt** *command*
+
+Run a *command* and paste its output as a code block. Disables the Markdown processor for the contents of the code block
+
+--------------------
+
+> !**exec_inc** *command*
+
+Run a command and include its output as teg code
+
+### Elements (I did not know they were called tags)
 
 > !**e** *element* *class* *options*
 
-Open an HTML tag on first call, remember the class, and close the tag on the second call for the same class
+Open an HTML tag on first call, close the tag on the second call for the same class
 
-If *class* is "_", the HTML tag does not receive a class
+If *class* is "_", the tag does not receive a class (useful for setting options without giving it one)
 
-If *class* starts with #, assign an HTML ID instead. If you try to create two elements with the same ID, an error is thrown
+If *class* starts with a **#**, assign an HTML ID instead. If you try to create two elements with the same ID, an error is thrown
 
-The *options* get passed to the HTML tag like so: `!e div _ style="font-size: 90%;"` -> `<div style="font-size: 90%;">`
+The *options* get passed to the tag like so: `!e div _ style="font-size: 90%"` -> `<div style="font-size: 90%">`
 
+If you call **!e** without any arguments, the last opened tag will be closed
+
+Example:
+```
+!e pre container style="padding: 1em; border: 2px dotted black; font-family: monospace"
+Hello, world!
+This is a demo of the teg element call.
+!e
+```
+--------------------
 
 > !**eo** *element* *class* *options*
 
-Same as !**e**, just don't remember the class and don't close the element. Only use on self-closing tags!
+Same as !**e**, just don't close the tag on a second call for the same class
 
+Useful for self-closing tags!
+
+--------------------
 
 > !**eoc** *element* *class* *options*
 
-Same as !**eo**, just immediately close the tag.
+Same as !**eo**, just immediately close the tag
 
 ## Inline calls
 The following syntax can be used to include a call or a variable without splitting a line:
@@ -155,28 +178,28 @@ hello \\\{$who$} <- Yes!
 ```
 
 # Builtin variables
-teg has some built-in variables that you can read for information or set to change behavior:
+teg has some built-in variables that you can read for information or set to change behavior.
+They can be put into several groups similarly to calls:
 
-
-> **file**
-
-File that is currently being processed
-
+## Basics
 
 > **title**=**file**
 
 Page title
 
+--------------------
 
 > **description**
 
 Page description for OpenGraph embeds
 
+--------------------
 
 > **lang**=*en-US*
 
 Page locale
 
+--------------------
 
 > **status**
 
@@ -184,6 +207,7 @@ Return an HTTP status for use with CGI
 
 Must be set before !**start**
 
+--------------------
 
 > **ctype**=*text/html*
 
@@ -191,11 +215,19 @@ Content type for use with CGI
 
 Only works together with **status**
 
+---------------------
+
+> **icon**
+
+Favicon path
+
+## Embeds and media
 
 > **color_chrome**
 
 Browser style color (only for mobile)
 
+--------------------
 
 > **embed_img**
 
@@ -203,11 +235,13 @@ Add an image embed
 
 Must be a link to a website
 
+--------------------
 
 > **embed_og**=*0*
 
 Enable OpenGraph embeds (`<meta property="og:.." ...>`)
 
+--------------------
 
 > **embed_twt**=*0*
 
@@ -218,11 +252,7 @@ as it also uses OpenGraph
 
 This is used by Discord for large image embeds
 
-
-> **icon**
-
-Favicon path
-
+## Styling
 
 > **style**
 
@@ -230,6 +260,7 @@ External CSS stylesheet to reference, specified as a list of files separated by 
 
 Example: `!var style=data/main.css;mine.css`
 
+--------------------
 
 > **style_inline**
 
@@ -237,6 +268,7 @@ CSS stylesheet to include in HTML
 
 Supports the same semicolon separated syntax
 
+## JS
 
 > **script**
 
@@ -244,6 +276,7 @@ External JS to reference
 
 Supports the same semicolon separated syntax
 
+--------------------
 
 > **script_inline**
 
@@ -251,56 +284,41 @@ Inline JS to include in <body>
 
 Supports the same semicolon separated syntax
 
+## Internals and debug
 
 > **debug**=*0*
 
 Enable / disable debug logging
 
+--------------------
 
 > **exit_on_error**=*1*
 
 Abort processing and exit on error
 
+--------------------
 
 > **no_br**=*0*
 
 Ignore line breaks for the next N lines
 
+--------------------
 
 > **no_proc**=*0*
 
 Halt processing for the next N lines
 
+--------------------
 
-> **curr_line**
+> **file**
 
-Current line, unprocessed
+File that is currently being processed
 
-
-> **prev_line**
-
-Previous line, processed
-
-
-> **e_nest_lvl**=*0*
-
-Current element nesting level
-
-
-> **inside_pre**=*0*
-
-Are we inside preformatted text?
-
-
-> **inside_codeblock**=*0*
-
-Are we inside a codeblock?
-
-## Markdown
+# Markdown
 teg's markdown is relatively close to the one you are familiar with, except for things like
 altered newline behavior, styles inside single quote `code` and some missing complex features like tables.
 
-### Spoilers
+## Spoilers
 
 ```
 ||[Click me]Boo!||
@@ -308,7 +326,7 @@ altered newline behavior, styles inside single quote `code` and some missing com
 
 ||[Click me]Boo!||
 
-### Modified newline behavior
+## Modified newline behavior
 
 ```
 Line 1
@@ -327,7 +345,7 @@ Line 2
 Line 4?
 ```
 
-### Strikethrough text
+## Strikethrough text
 
 ```
 ~~strikethrough!~~
