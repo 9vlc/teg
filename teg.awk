@@ -755,7 +755,7 @@ function TEG_calls_start(call,   str,line,cnt,a,i) {
 	if (TEG_c_vars["script"]) {
 		cnt = split(TEG_c_vars["script"], a, ";")
 		for (i = 1; i <= cnt; i++)
-			str = str"\n" "\t<script src=\"" TEG_strip_sp(a[i]) "\"></script>"
+			str = str"\n" "\t<script src=\"" TEG_strip_sp(a[i]) "\" defer></script>"
 	}
 
 	TEG_reached_start = 1
