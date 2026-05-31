@@ -123,13 +123,15 @@ If *class* is "_", the tag does not receive a class (useful for setting options 
 
 If *class* starts with a **#**, assign an HTML ID instead. If you try to create two elements with the same ID, an error is thrown
 
+You can specify multiple classes / IDs by separating them with semicolons like so: `!e div #some-id;some-class1;some-class2`
+
 The *options* get passed to the tag like so: `!e div _ style="font-size: 90%"` -> `<div style="font-size: 90%">`
 
 If you call **!e** without any arguments, the last opened tag will be closed
 
 Example:
 ```
-!e pre container style="padding: 1em; border: 2px dotted black; font-family: monospace"
+!e pre #container;containers;borders; style="padding: 1em; border: 2px dotted black; font-family: monospace"
 Hello, world!
 This is a demo of the teg element call.
 !e
