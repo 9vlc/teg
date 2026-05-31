@@ -4,7 +4,7 @@
 !var style_inline=extra/style.css
 !start
 # What's teg?
-teg is a small *(~700 LOC by `cloc`, ~1000 lines total)* portable web "[anti-framework](https://werc.cat-v.org)" foundation made in AWK,
+teg is a small *(~770 LOC by `cloc`, ~1200 lines total)* portable web "[anti-framework](https://werc.cat-v.org)" foundation made in AWK,
 compatible with pretty much all AWKs out there, so you can even use teg on [Plan 9](https://en.wikipedia.org/wiki/Plan_9_from_Bell_Labs).
 
 
@@ -258,31 +258,47 @@ This is used by Discord for large image embeds
 
 External CSS stylesheet to reference, specified as a list of files separated by a semicolon
 
-Example: `!var style=data/main.css;mine.css`
+Example: `!var style=/data/main.css;custom.css`
 
 --------------------
 
 > **style_inline**
 
-CSS stylesheet to include in HTML
+CSS stylesheet files to include in HTML
 
 Supports the same semicolon separated syntax
+
+
+Can be also a stylesheet directly inside teg by using a heredoc variable declaration,
+determined to be one if it's more than one line in length.
+
+Example:
+```
+!var style_inline<eol
+body {
+	font: monospace;
+}
+eol
+```
 
 ## JS
 
 > **script**
 
-External JS to reference
+JS file to reference in <head>
 
-Supports the same semicolon separated syntax
+Supports the same semicolon separated syntax as **style**
 
 --------------------
 
 > **script_inline**
 
-Inline JS to include in <body>
+JS files to include at the start of <body>
 
-Supports the same semicolon separated syntax
+Supports the same semicolon separated syntax as **script**
+
+
+Supports the same heredoc declaration as **style_inline**
 
 ## Internals and debug
 
@@ -300,7 +316,7 @@ Abort processing and exit on error
 
 > **no_br**=*0*
 
-Ignore line breaks for the next N lines
+Do not put line breaks for the next N lines
 
 --------------------
 

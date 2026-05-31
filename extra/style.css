@@ -1,10 +1,9 @@
 h1, h2, h3, h4, h5, h6 {
-	text-decoration: lightgray wavy underline;
+	text-decoration: lightgray underline;
 }
 
 summary {
 	cursor: crosshair;
-	text-decoration: #ed0 wavy underline;
 }
 
 summary::before {
@@ -23,13 +22,13 @@ summary:hover {
 
 em {
 	color: #555;
-	text-decoration: lightgray wavy underline;
+	text-decoration: lightgray underline;
 }
 
 a {
 	color: black;
 	cursor: crosshair;
-	text-decoration: #36a wavy underline;
+	text-decoration: #36a underline;
 
 }
 
@@ -40,16 +39,18 @@ a:hover {
 
 body {
 	font-family: monospace;
-	font-size: 12pt;
+	font-size: 12.5pt;
 	background: white;
 	margin: 1em;
 
 }
 
-body::selection {
-	background: #fc6;
+*::selection {
+	color: black;
+	background: white;
 }
 
+/* Only works on chromium (and presumably Webkit) */
 *::-webkit-scrollbar {
 	width: 12px;
 	height: 12px;
@@ -77,8 +78,8 @@ pre {
 
 }
 
-pre::selection {
-	background: #acd;
+code::selection {
+	background: #Fcd;
 	color: black;
 }
 

@@ -38,7 +38,7 @@ function TEG_init() {
 	#
 	# Internal variables
 	#
-	
+
 	# Check
 	TEG_init_done = 1
 	# Did we reach any data in the file
@@ -73,7 +73,8 @@ function TEG_init() {
 	TEG_inside_pre = 0
 	# Are we inside a codeblock?
 	TEG_inside_codeblock = 0
-
+	# For line escapes (\ at the end of the line thing)
+	TEG_escaped_line = ""
 
 	# REGEX for different things
 	TEG_reglist["call_inline"] = "\\{![^{][^!]*!\\}"
@@ -134,8 +135,6 @@ function TEG_init() {
 	TEG_c_vars["status"] = 0
 	# HTTP content type (required for cgi)
 	TEG_c_vars["ctype"] = "text/html"
-	# Color accent for mobile chromium and some social media embeds
-	TEG_c_vars["color_chrome"] = 0
 }
 
 #
@@ -297,7 +296,7 @@ function TEG_escape_html_wrap(str,   parts,ret,i) {
 			else
 				str = str "{!" parts[i] "!}"
 		}
-	} else if (str !~ /^![A-Za-z0-9_]+[ \t]/)
+	} else if (str !~ /^![A-Za-z0-9_]+[ \t]/ || TEG_inside_codeblock)
 		return TEG_escape_html(str)
 	return str
 }
@@ -356,9 +355,21 @@ function TEG_read_list(list, delim,   file,files,cnt,line,r) {
 # Markdown processor
 # Call for each line and finish execution with one empty string and TEG_c_vars["no_br"] = 1
 #
-function TEG_md_fmt(str,   indent_len,blockstr,i,start,liststr,ix,rl,link_md,is_image,text,link,end,spoiler_md,preview) {
+function TEG_md_fmt(str,   i,p,str2,indent_len,blockstr,start,liststr,ix,rl,link_md,is_image,text,link,end,spoiler_md,preview) {
 	if (TEG_c_vars["no_proc"]) {
 		return str
+	}
+
+	# Nasty hack for multiline input
+	if (str ~ /\n/) {
+		str2 = ""
+		for (i = 1; i <= split(str, p, "\n"); i++) {
+			if (str2 != "")
+				str2 = str2 "\n" TEG_md_fmt(p[i])
+			else
+				str2 = TEG_md_fmt(p[i])
+		}
+		return str2
 	}
 
 	match(str, /^[ \t]*/)
@@ -675,7 +686,7 @@ function TEG_calls_e(call, shot,   elem_name,elem_class,elem_props,arg_count,fin
 			(elem_props  ? " " elem_props : ""),
 			elem_name)
 	}
-	
+
 	return final
 }
 
@@ -748,7 +759,14 @@ function TEG_calls_start(call,   str,line,cnt,a,i) {
 
 	if (TEG_c_vars["style_inline"]) {
 		TEG_logt("starting inline style")
-		str = str"\n" "\t<style>" TEG_read_list(TEG_c_vars["style_inline"], ";")
+		str = str"\n" "\t<style>"
+
+		# Has a newline - likely a heredoc inline style
+		if (TEG_c_vars["style_inline"] ~ /\n/)
+			str = str TEG_c_vars["style_inline"]
+		else
+			str = str TEG_read_list(TEG_c_vars["style_inline"], ";")
+
 		str = str"\n" "\t</style>"
 	}
 
@@ -768,7 +786,14 @@ function TEG_calls_start(call,   str,line,cnt,a,i) {
 	#
 	if (TEG_c_vars["script_inline"]) {
 		TEG_logt("starting inline script")
-		str = str"\n" "\t<script>" TEG_read_list(TEG_c_vars["script_inline"], ";")
+		str = str"\n" "\t<script>"
+
+		# Similar thing to styles
+		if (TEG_c_vars["script_inline"] ~ /\n/)
+			str = str TEG_c_vars["script_inline"]
+		else
+			str = str TEG_read_list(TEG_c_vars["script_inline"], ";")
+
 		str = str"\n" "\t</script>"
 	}
 	return str
@@ -780,7 +805,8 @@ function TEG_calls_start(call,   str,line,cnt,a,i) {
 # Abort execution of a teg script
 # No return
 #
-function TEG_calls_abort(call) {
+function TEG_calls_abort(call,   str) {
+	str = ""
 	if (!TEG_reached_start) {
 		if (TEG_c_vars["status"]) {
 			str = str     "Status: " TEG_c_vars["status"]
@@ -855,12 +881,12 @@ function TEG_calls_exec_inc(call,   str,line,tmp,i,c) {
 	c = 0
 	str = ""
 	if (TEG_is_null(call[0])) {
-		TEG_logt("empty !exec_raw command", 3)
+		TEG_logt("empty !exec_inc command", 3)
 		return
 	}
 
 	#
-	# Must separate getline and TEG_proc else we get a nasty
+	# Must separate getline and TEG_proc else we get a strange
 	# vulnerability on gawk because of pipe propagation
 	# (I should probably report this someday???)
 	#
@@ -883,39 +909,40 @@ function TEG_calls_exec_inc(call,   str,line,tmp,i,c) {
 # Set variable to value.
 # If value is not provided
 #
-function TEG_calls_var(call,   eqpos,key,value,marker) {
+function TEG_calls_var(call,   eqpos,arpos,key,value,marker) {
 	eqpos = index(call[0], "=")
+	arpos = index(call[0], "<")
 
-	if (!eqpos) {
-		eqpos = index(call[0], "<")
-		if (!eqpos)
-			return TEG_c_vars[key]
-
+	if (!eqpos && !arpos && TEG_reached_start) {
+		# If no < or = return the variable contents
+		return TEG_c_vars[call[0]]
+	} else if (!eqpos) {
 		# < logic
-		key = substr(call[0], 1, eqpos - 1)
-		marker = substr(call[0], eqpos + 1)
+		key = substr(call[0], 1, arpos - 1)
+		marker = substr(call[0], arpos + 1)
+
+		# No
+		if (TEG_is_null(marker))
+			return
 
 		# Can only have up to one at the same time, sorry
 		if (TEG_var_long)
 			TEG_logt("can't do two long variables", 3)
 		else {
 			TEG_var_long = key"<"marker
+			TEG_c_vars[key] = ""
 			TEG_logt("long var: '"TEG_var_long"'")
 		}
-		TEG_c_vars["no_br"] ++
-		return
-	}
+	} else {
+		# = logic
+		key = substr(call[0], 1, eqpos - 1)
+		value = substr(call[0], eqpos + 1)
 
-	# = logic
-	key = substr(call[0], 1, eqpos - 1)
-	value = substr(call[0], eqpos + 1)
-
-	if (value ~ /^-?[0-9]+$/)
-		TEG_c_vars[key] = value + 0
-	else
 		TEG_c_vars[key] = value
 
-	TEG_logt("'"key"' = ""'"value"'")
+		TEG_logt("'"key"' = ""'"value"'")
+	}
+
 	TEG_c_vars["no_br"] ++
 	return
 }
@@ -963,9 +990,9 @@ function TEG_calls_log(call) {
 
 #
 # Run a call
-# 
+#
 # explicit = 1 - Process the call even before !start
-# 
+#
 # call["name"] - call name
 # call[0]      - concat args
 # call[1+]     - args
@@ -1038,13 +1065,16 @@ function TEG_callproc(str, explicit,   len,call,long_key,long_marker,delim,nope,
 	# If we're doing a !var name<EOL
 	if (TEG_var_long && long_marker) {
 		if (str == long_marker) {
+			TEG_logt("ending long var '" TEG_var_long "'")
+			TEG_logt("var content: '" TEG_c_vars[long_key] "'")
 			TEG_var_long = ""
-			TEG_logt("str: "str" marker: "long_marker)
-			TEG_c_vars["no_br"] ++ # +2
-			TEG_c_vars[long_key] = TEG_c_vars[long_key] TEG_md_fmt("")
+		} else {
+			TEG_logt("<< " str)
+			if (TEG_c_vars[long_key] != "")
+				TEG_c_vars[long_key] = TEG_c_vars[long_key] "\n" str
+			else
+				TEG_c_vars[long_key] = str
 		}
-		else
-			TEG_c_vars[long_key] = TEG_c_vars[long_key] TEG_md_fmt(str) "\n"
 
 		TEG_c_vars["no_br"] ++
 		return
@@ -1103,8 +1133,27 @@ function TEG_proc(str) {
 		exit(1)
 	}
 
+	# Hack for multiline escapes
+	if (str ~ /\\$/) {
+		# Accumulate
+		sub(/\\$/, "", str)
+		TEG_logt("\\< " str)
+		if (!TEG_is_null(TEG_escaped_line)) {
+			str = "\n" str
+		}
+		TEG_escaped_line = TEG_escaped_line str
+		return
+	} else if (!TEG_is_null(TEG_escaped_line)) {
+		# Flush
+		TEG_logt("\\< " str)
+		str = TEG_escaped_line "\n" str
+		TEG_logt("\\> '" str "'")
+		TEG_escaped_line = ""
+	}
+
 	TEG_curr_line = str
 
+	# No
 	if (str ~ /^==/ && !TEG_inside_codeblock && !TEG_c_vars["no_proc"])
 		return
 
@@ -1134,7 +1183,7 @@ function TEG_proc(str) {
 	# New special case for codeblocks (makes html less prettier but idc)
 	if (TEG_inside_codeblock)
 		str = "\n" str
-	else if ((TEG_curr_line !~ /^![^ \t].+/) && !TEG_var_long)
+	else if ((TEG_curr_line !~ /^![^ \t].+$/) && !TEG_var_long)
 		str = str "\n"
 
 	if (TEG_c_vars["no_proc"] && TEG_c_vars["no_proc"] ~ /^[0-9]+$/)
