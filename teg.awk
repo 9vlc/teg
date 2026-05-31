@@ -663,7 +663,7 @@ function TEG_calls_e(call, shot,   elem_class_id,elem_name,elem_class,elem_props
 	# Create tag
 	TEG_logt("new " shot == 0 ? "" : "oneshot" (shot == 1 ? "(open)" : "(closed)") "element: '" elem_name "'")
 	if (shot == 0) {
-		if (TEG_is_null(elem_name) {
+		if (TEG_is_null(elem_name)) {
 			if (TEG_is_null(TEG_last_elem))
 				TEG_logt("we haven't opened an element yet!", 3)
 			if (!TEG_elems[TEG_last_elem])
