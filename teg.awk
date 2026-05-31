@@ -609,10 +609,11 @@ function TEG_md_fmt(str,   i,p,str2,indent_len,blockstr,start,liststr,ix,rl,link
 #
 # The shot argument determines whether to act as !e, !eo or !eoc
 #
-function TEG_calls_e(call, shot,   elem_name,elem_class,elem_props,arg_count,final,id,i) {
+function TEG_calls_e(call, shot,   elem_class_id,elem_name,elem_class,elem_props,arg_count,final,i,elem_id,elem_ident,classes) {
 	elem_name = call[1]
-	elem_class = (call[2] ? call[2] : "_")
-	arg_count = 0
+	elem_class_id = (call[2] ? call[2] : "_")
+
+    arg_count = 0
 	for (elem_props in call)
 		arg_count ++
 
@@ -623,71 +624,83 @@ function TEG_calls_e(call, shot,   elem_name,elem_class,elem_props,arg_count,fin
 	sub(/^[ \t]+/, "", elem_props)
 
 	elem_name = TEG_strip_sp(elem_name)
-	elem_class = TEG_strip_sp(elem_class)
+	elem_class_id = TEG_strip_sp(elem_class_id)
 	elem_props = TEG_strip_sp(elem_props)
 
 	if (TEG_is_null(elem_name) && shot != 0)
 		TEG_logt("empty element", 3)
 
-	# Check if it's an id instead of a class
-	id = 0
-	if (elem_class ~ /^#/) {
-		id = 1
-		elem_class = substr(elem_class, 2)
+    elem_id = "_"
+    elem_class = "_"
+    for (i = 1; i <= split(elem_class_id, classes, ";"); i++) {
+        if (classes[i] ~ /^#/) {
+            # Process id
+            if (elem_id != "_") {
+                TEG_logt("id specified more than once in element '" elem_name "'", 3)
+            }
+            elem_id = substr(classes[i], 2)
+            if (TEG_id_list[elem_id] == 1)
+		        TEG_logt("element id '" elem_id "' already taken", 3)
+        } else {
+            # Process class
+            if (classes[i] == "" || classes[i] == "_") {
+                continue
+            }
+            if (elem_class == "_") {
+                elem_class = classes[i]
+                continue
+            }
+            elem_class = elem_class " " classes[i]
+        }
+    }
 
-		if (TEG_id_list[elem_class] == 1)
-			TEG_logt("element id '" elem_class "' already taken", 3)
-	}
+    if (elem_id != "_") {
+        TEG_id_list[elem_id] = 1
+    }
 
-	# Close the last tag on plain "!e"
-	if (shot == 0 && TEG_is_null(elem_name)) {
-		if (TEG_is_null(TEG_last_elem))
-			TEG_logt("we haven't opened an element yet!", 3)
-		if (!TEG_elems[TEG_last_elem])
-			TEG_logt("last element was already closed", 3)
-		final = "</" substr(TEG_last_elem, 1, index(TEG_last_elem, "_") - 1) ">"
-		TEG_elems[TEG_last_elem] = 0
-	}
+    # Create tag
+    TEG_logt("new " shot == 0 ? "" : "oneshot" (shot == 1 ? "(open)" : "(closed)") "element: '" elem_name "'")
+    if (shot == 0) {
+        if (TEG_is_null(elem_name) {
+            if (TEG_is_null(TEG_last_elem))
+			    TEG_logt("we haven't opened an element yet!", 3)
+		    if (!TEG_elems[TEG_last_elem])
+			    TEG_logt("last element was already closed", 3)
+		    TEG_elems[TEG_last_elem] = 0
+            return "</" substr(TEG_last_elem, 1, index(TEG_last_elem, "_") - 1) ">"
+        }
 
-	# Otherwise do this mess
-	if (shot == 0 && TEG_is_null(final)) {
-		if (!TEG_elems[elem_name "_" elem_class]) {
-			TEG_logt("new element: '" elem_name "'")
-			TEG_elems[elem_name "_" elem_class] = 1
-			TEG_e_nest_lvl ++
-			TEG_last_elem = elem_name "_" elem_class
-			final = sprintf("<%s%s%s>\n",
-				elem_name,
-				(elem_class == "_" ? "" : (id ? " id" : " class")"=\"" elem_class "\""),
-				(elem_props  ? " " elem_props : ""))
-		} else {
-			TEG_logt("closing element: '" elem_name "'")
-			TEG_elems[elem_name "_" elem_class] = 0
-			if (id)
-				TEG_id_list[elem_class] = 1
-			TEG_e_nest_lvl --
-			final = "</" elem_name ">"
-		}
-	} else if (shot == 1) {
-		TEG_logt("new oneshot (open) element: '" elem_name "'")
-		if (id)
-			TEG_id_list[elem_class] = 1
-		final = sprintf("<%s%s%s>",
-			elem_name,
-			(elem_class == "_" ? "" : (id ? " id" : " class")"=\"" elem_class "\""),
-			(elem_props  ? " " elem_props : ""))
-	} else if (shot == 2) {
-		TEG_logt("new oneshot (closed) element: '" elem_name "'")
-		if (id)
-			TEG_id_list[elem_class] = 1
-		final = sprintf("<%s%s%s></%s>",
-			elem_name,
-			(elem_class == "_" ? "" : (id ? " id" : " class")"=\"" elem_class "\""),
-			(elem_props  ? " " elem_props : ""),
-			elem_name)
-	}
+        elem_ident = elem_name "_" elem_class
+        if (!TEG_elems[elem_ident]) {
+            # Remember tag
+            TEG_elems[elem_ident] = 1
+            TEG_e_nest_lvl ++
+            TEG_last_elem = elem_ident
+        } else {
+            TEG_logt("closing element: '" elem_name "'")
 
-	return final
+            TEG_elems[elem_ident] = 0
+            TEG_e_next_lvl --
+            return "</" elem_name ">"
+        }
+    }
+
+    final = "<" elem_name
+    if (elem_id != "_") {
+        final = final " id=\"" elem_id "\""
+    }
+    if (elem_class != "_") {
+        final = final " class=\"" elem_class "\""
+    }
+    if (elem_props) {
+        final = final " " elem_props
+    }
+    final = final ">"
+    if (shot == 3) {
+        final = final "</" elem_name ">"
+    }
+
+    return final
 }
 
 #
