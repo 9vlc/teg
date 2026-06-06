@@ -641,7 +641,7 @@ function TEG_calls_e(call, shot,   elem_class_id,elem_name,elem_class,elem_props
 				TEG_logt("id specified more than once in element '" elem_name "'", 3)
 			}
 			elem_id = substr(classes[i], 2)
-			if (TEG_id_list[elem_id] == 1)
+			if (TEG_id_list[elem_id] == 1 && !TEG_elems[TEG_last_elem])
 				TEG_logt("element id '" elem_id "' already taken", 3)
 		} else {
 			# Process class
