@@ -732,29 +732,29 @@ function TEG_calls_start(call,   str,line,cnt,a,i) {
 	str = str"\n" "<head>"
 	str = str"\n" "\t<meta charset=\"UTF-8\">"
 	str = str"\n" "\t<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
-	if (TEG_c_vars["embed_og"])
+	if (TEG_c_vars["embed_og"] != 0)
 		str = str"\n" "\t<meta property=\"og:type\" content=\"website\">"
 
 	if (TEG_c_vars["title"]) {
 		str = str"\n" "\t<title>" TEG_c_vars["title"] "</title>"
-		if (TEG_c_vars["embed_og"])
+		if (TEG_c_vars["embed_og"] != 0)
 			str = str"\n" "\t<meta property=\"og:title\" content=\"" TEG_c_vars["title"] "\">"
-		if (TEG_c_vars["embed_twt"])
+		if (TEG_c_vars["embed_twt"] != 0)
 			str = str"\n" "\t<meta name=\"twitter:title\" content=\"" TEG_c_vars["title"] "\">"
 	}
 
 	if (TEG_c_vars["description"]) {
 		str = str"\n" "\t<meta name=\"description\" content=\"" TEG_c_vars["description"] "\">"
-		if (TEG_c_vars["embed_og"])
+		if (TEG_c_vars["embed_og"] != 0)
 			str = str"\n" "\t<meta property=\"og:description\" content=\"" TEG_c_vars["description"] "\">"
-		if (TEG_c_vars["embed_twt"])
+		if (TEG_c_vars["embed_twt"] != 0)
 			str = str"\n" "\t<meta name=\"twitter:description\" content=\"" TEG_c_vars["description"] "\">"
 	}
 
 	if (TEG_c_vars["embed_img"]) {
-		if (TEG_c_vars["embed_og"])
+		if (TEG_c_vars["embed_og"] != 0)
 			str = str"\n" "\t<meta property=\"og:image\" content=\"" TEG_c_vars["embed_img"] "\">"
-		if (TEG_c_vars["embed_twt"]) {
+		if (TEG_c_vars["embed_twt"] != 0) {
 			str = str"\n" "\t<meta name=\"twitter:card\" content=\"summary_large_image\">"
 			str = str"\n" "\t<meta name=\"twitter:image\" content=\"" TEG_c_vars["embed_img"] "\">"
 		}
