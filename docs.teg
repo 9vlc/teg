@@ -12,7 +12,6 @@ teg is meant to be a minimal building block for your full website; it only acts 
 You can piece together teg with your own scripts and programs to, for example, make a full-on [CGI](https://en.wikipedia.org/wiki/Common_Gateway_Interface) system.
 teg can be used with a [Makefile](https://en.wikipedia.org/wiki/Make_(software)) to generate a static site from a list of `.teg` files.
 
-
 # Why's teg?
 I wanted a simple framework for my website to not write everything in HTML by hand.
 Everything I looked at didn't fit me in one way or another, so I decided to just
@@ -113,7 +112,7 @@ Run a *command* and paste its output as a code block. Disables the Markdown proc
 
 Run a command and include its output as teg code
 
-### Elements (I did not know they were called tags)
+### Elements / Tags
 
 > !**e** *element* *class* *options*
 
@@ -370,6 +369,12 @@ Line 4?
 ```
 ~~strikethrough!~~
 
+## Small text
+
+```
+-# I am tiny!
+```
+-# I am tiny!
 
 # Library usage
 teg can be used as a library in GAWK.
@@ -381,13 +386,12 @@ BEGIN { TEG_AS_LIBRARY = 1 }
 
 Some of the more useful functions you get access to are:
 
-
 > **TEG_init**()
 
 Initialize teg
 
 
-> **TEG_proc**(*src*) 
+> **TEG_proc**(*src*)
 
 Process a line, returns formatted line
 
@@ -465,7 +469,6 @@ Check if a string is empty or made of purely whitespace, returns 1 if yes and 0 
 --------
 
 Some of the useful variables you get access to are:
-
 
 > **TEG_c_vars**[]
 

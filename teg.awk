@@ -88,6 +88,15 @@ function TEG_init() {
 	TEG_reglist["md_code"] = "`[^`]+`"
 	TEG_reglist["md_link"] = "\\[[^\\]]*\\]\\([^)]*[^\\\\]\\)"
 	TEG_reglist["md_spoiler"] = "\\|\\|\\[[^\\]]*\\][^\\|]*\\|\\|"
+	TEG_reglist["md_h1"] = "^# "
+	TEG_reglist["md_h2"] = "^## "
+	TEG_reglist["md_h3"] = "^### "
+	TEG_reglist["md_h4"] = "^#### "
+	TEG_reglist["md_h5"] = "^##### "
+	TEG_reglist["md_h6"] = "^###### "
+	TEG_reglist["md_small"] = "^-# "
+	TEG_reglist["md_hr"] = "^---+$"
+	TEG_reglist["md_blockquote"] = "^>+"
 
 	# Whitelist for variables that are allowed before !start
 	TEG_before_start_list = "(start|abort|var|inc|log|exec_inc)"
@@ -278,7 +287,7 @@ function TEG_escape_html(str) {
 	# gsub(/'/, "\\&apos;", str)
 	gsub(/</, "\\&lt;", str)
 	gsub(/\\\\/, "\\&#92;", str)
-	if (str !~ /^>+( |$)/)
+	if (str !~ TEG_reglist["md_blockquote"])
 		gsub(/>/, "\\&gt;", str)
 	return str
 }
@@ -409,23 +418,29 @@ function TEG_md_fmt(str,   i,p,str2,indent_len,blockstr,start,liststr,ix,rl,link
 	#
 	# Headings
 	#
-	if (str ~ /^# /)
-		str = "<h1>" substr(str, 3) "</h1>"
-	if (str ~ /^## /)
-		str = "<h2>" substr(str, 4) "</h2>"
-	if (str ~ /^### /)
-		str = "<h3>" substr(str, 5) "</h3>"
-	if (str ~ /^#### /)
-		str = "<h4>" substr(str, 6) "</h4>"
-	if (str ~ /^##### /)
-		str = "<h5>" substr(str, 7) "</h5>"
-	if (str ~ /^###### /)
-		str = "<h6>" substr(str, 8) "</h6>"
+	if (str ~ TEG_reglist["md_h1"])
+		str = "<h1>" substr(str, index(str, " ")+1) "</h1>"
+	else if (str ~ TEG_reglist["md_h2"])
+		str = "<h2>" substr(str, index(str, " ")+1) "</h2>"
+	else if (str ~ TEG_reglist["md_h3"])
+		str = "<h3>" substr(str, index(str, " ")+1) "</h3>"
+	else if (str ~ TEG_reglist["md_h4"])
+		str = "<h4>" substr(str, index(str, " ")+1) "</h4>"
+	else if (str ~ TEG_reglist["md_h5"])
+		str = "<h5>" substr(str, index(str, " ")+1) "</h5>"
+	else if (str ~ TEG_reglist["md_h6"])
+		str = "<h6>" substr(str, index(str, " ")+1) "</h6>"
+
+	#
+	# Smol
+	#
+	if (str ~ TEG_reglist["md_small"])
+		str = "<small>" substr(str, index(str, " ")+1) "</small>"
 
 	#
 	# Horizontal rule
 	#
-	if (str ~ /^---+$/) {
+	if (str ~ TEG_reglist["md_hr"]) {
 		str = "<hr>"
 	}
 
@@ -435,8 +450,8 @@ function TEG_md_fmt(str,   i,p,str2,indent_len,blockstr,start,liststr,ix,rl,link
 	# Current depth
 	#
 	TEG_blockquote_lvl[0] = 0
-	if (str ~ /^>+/) {
-		match(str, /^>+/)
+	if (str ~ TEG_reglist["md_blockquote"]) {
+		match(str, TEG_reglist["md_blockquote"])
 		TEG_blockquote_lvl[0] = RLENGTH
 		if (TEG_blockquote_lvl[0] > 0)
 			str = substr(str, TEG_blockquote_lvl[0] + 2)
@@ -1149,7 +1164,7 @@ function TEG_proc(str) {
 	}
 
 	# Hack for multiline escapes
-	if (str ~ /\\$/) {
+	if (str ~ /\\$/ && !TEG_inside_codeblock) {
 		# Accumulate
 		sub(/\\$/, "", str)
 		TEG_logt("\\< " str)
